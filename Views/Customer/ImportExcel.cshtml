@@ -1,0 +1,91 @@
+@{
+    ViewData["Title"] = "Excel/Rapor Import (Pipeline)";
+}
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-file-earmark-excel me-2"></i>TopluCariEkstreRaporu Yükle
+                    </h4>
+                </div>
+                <div class="card-body">
+                    
+                    @if (TempData["ErrorMessage"] != null)
+                    {
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+                        </div>
+                    }
+
+                    @if (TempData["ImportErrors"] is List<string> importErrors && importErrors.Any())
+                    {
+                        <div class="alert alert-warning">
+                            <strong>Hata Detayları:</strong>
+                            <ul class="mb-0 mt-2 small">
+                                @foreach (var error in importErrors)
+                                {
+                                    <li>@error</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    <div class="alert alert-primary mb-4">
+                        <i class="bi bi-magic me-2"></i>
+                        <strong>Otomatik Pipeline!</strong>
+                        <hr class="my-2" />
+                        <small>
+                            Bu özellik <strong>TopluCariEkstreRaporu</strong> formatındaki dosyaları otomatik olarak parse eder:<br /><br />
+                            📥 <strong>Dosya Yükle</strong> → 
+                            🔍 <strong>Cari Kodu'na göre böl</strong> → 
+                            📝 <strong>Regex ile ayıkla</strong> → 
+                            💾 <strong>Veritabanına kaydet</strong>
+                        </small>
+                    </div>
+
+                    <form asp-action="ImportExcel" method="post" enctype="multipart/form-data">
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="mb-4">
+                            <label for="file" class="form-label">
+                                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Rapor Dosyası Seçin
+                            </label>
+                            <input type="file" class="form-control form-control-lg" id="file" name="file" 
+                                   accept=".txt,.xlsx,.xls,.csv" required />
+                            <div class="form-text">Desteklenen formatlar: .txt, .xlsx, .xls, .csv</div>
+                        </div>
+
+                        <hr class="my-4" />
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Geri Dön
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-lightning-charge me-1"></i>Pipeline Çalıştır
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-4 border-primary">
+                <div class="card-header bg-light">
+                    <i class="bi bi-info-circle me-2"></i>Beklenen Dosya Formatı
+                </div>
+                <div class="card-body small">
+                    <p>Dosya içinde her müşteri bloğu şu şekilde başlamalıdır:</p>
+                    <pre class="bg-light p-2 rounded mb-0"><code>Cari Kodu: 120-001-0001
+Cari Adı: ABC TİCARET LTD. ŞTİ.
+Telefon: 0212 555 1234
+Adres: İstanbul, Türkiye
+Borç Bakiye: 15.750,00
+Alacak Bakiye: 0,00</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
