@@ -547,7 +547,7 @@ BEGIN
     SET @BatchID = SCOPE_IDENTITY();
 END;
 GO
-CREATE PROCEDURE sp_ProcessReconciliation
+CREATE OR ALTER PROCEDURE sp_ProcessReconciliation
     @BatchID INT
 AS
 BEGIN
@@ -555,29 +555,50 @@ BEGIN
     BEGIN TRANSACTION;
 
     BEGIN TRY
-        -- 1. Detay tablosuna o anki sistem bakiyesini bilgi amaçlı yaz (Loglama)
+        -- 1. ADIM: Eşleşenlerin Eski Bakiyesini Logla
+        -- (Burada duplicate olması sorun yaratmaz, update ezer geçer)
         UPDATE D
         SET D.SystemBalanceAtTime = C.CurrentBalance
         FROM ImportDetails D
         INNER JOIN Customers C ON D.AccountCode = C.AccountCode
         WHERE D.BatchID = @BatchID;
 
-        -- 2. Müşteri Bakiyelerini DİREKT olarak Excel verisine eşitle (Overwrite)
-        -- Fark hesabı veya Transaction kaydı YOK. Sadece son durum geçerli.
-        UPDATE C
-        SET C.CurrentBalance = D.ExcelBalance
-        FROM Customers C
-        JOIN ImportDetails D ON C.AccountCode = D.AccountCode
-        WHERE D.BatchID = @BatchID;
+        -- 2. ADIM (DÜZELTİLEN KISIM): Yeni Müşterileri 'Customers' Tablosuna EKLE
+        -- GROUP BY kullanarak aynı koddan birden fazla varsa TEKE düşürüyoruz.
+        INSERT INTO Customers (AccountCode, CompanyName, CurrentBalance, RiskLimit, TaxID, Address)
+        SELECT 
+            D.AccountCode, 
+            MAX(D.DetectedName), -- Aynı koddan 2 tane varsa ismin birini seç
+            MAX(D.ExcelBalance), -- Bakiyenin birini seç (Genelde sonuncudur)
+            0, 
+            NULL, 
+            NULL
+        FROM ImportDetails D
+        LEFT JOIN Customers C ON D.AccountCode = C.AccountCode
+        WHERE D.BatchID = @BatchID 
+          AND C.CustomerID IS NULL -- Sadece sistemde olmayanlar
+        GROUP BY D.AccountCode; -- <--- İŞTE BU SATIR HATAYI ÇÖZER
 
-        -- 3. Batch işlemini tamamlandı olarak işaretle
+        -- 3. ADIM: Mevcut Müşterilerin Bakiyesini Güncelle
+        -- Burada da duplicate ihtimaline karşı subquery ile tekil veri alıyoruz
+        UPDATE C
+        SET C.CurrentBalance = Source.MaxBalance
+        FROM Customers C
+        INNER JOIN (
+            SELECT AccountCode, MAX(ExcelBalance) as MaxBalance
+            FROM ImportDetails
+            WHERE BatchID = @BatchID
+            GROUP BY AccountCode
+        ) Source ON C.AccountCode = Source.AccountCode;
+
+        -- 4. ADIM: Batch Durumunu Kapat
         UPDATE ImportBatches SET Status = 'Processed' WHERE BatchID = @BatchID;
 
         COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
-        THROW; -- Hatayı C# tarafına fırlat
+        THROW;
     END CATCH
 END;
 GO
