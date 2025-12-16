@@ -486,3 +486,95 @@ GO
 CREATE NONCLUSTERED INDEX IX_SystemLogs_LogDate 
 ON SystemLogs (LogDate DESC);
 GO
+/* =============================================
+   SECTION: EXCEL IMPORT & RECONCILIATION TABLES
+   ============================================= */
+
+-- 1. Yükleme Paketleri (Excel Dosyasının Kimliği)
+CREATE TABLE ImportBatches (
+    BatchID INT IDENTITY(1,1) PRIMARY KEY,
+    FileName NVARCHAR(255) NOT NULL,       -- Örn: TopluCariEkstreRaporu_20251215142935.xlsx
+    FileTimestamp DATETIME NOT NULL,       -- Dosya isminden alınan tarih
+    UploadDate DATETIME DEFAULT GETDATE(), -- Sisteme yüklendiği an
+    UploadedBy INT,                        -- AppUsers tablosuna FK
+    TotalRecords INT,
+    Status NVARCHAR(20) DEFAULT 'Pending', -- Pending, Processed, Rejected (Eski tarihliyse red)
+    
+    CONSTRAINT UQ_FileName UNIQUE (FileName)
+);
+GO
+
+-- 2. Yükleme Detayları (Excel Satırları)
+CREATE TABLE ImportDetails (
+    DetailID INT IDENTITY(1,1) PRIMARY KEY,
+    BatchID INT NOT NULL,
+    AccountCode NVARCHAR(50), 
+    DetectedName NVARCHAR(200),
+    ExcelBalance DECIMAL(18,2),            -- Excel'deki o anki bakiye
+    SystemBalanceAtTime DECIMAL(18,2),     -- Karşılaştırma anındaki sistem bakiyesi
+    
+    CONSTRAINT FK_Import_Batch FOREIGN KEY (BatchID) REFERENCES ImportBatches(BatchID)
+);
+GOCREATE PROCEDURE sp_ValidateAndCreateBatch
+    @FileName NVARCHAR(255),
+    @FileTimestamp DATETIME, -- C#'ta dosya isminden parse edilip buraya gelecek
+    @UploadedBy INT,
+    @TotalRecords INT,
+    @BatchID INT OUTPUT      -- Geriye ID döndürecek
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- KURAL: İçeride daha yeni tarihli ve İŞLENMİŞ bir veri var mı?
+    -- Varsa, eski dosyayı kabul etme.
+    IF EXISTS (
+        SELECT 1 FROM ImportBatches 
+        WHERE FileTimestamp > @FileTimestamp 
+        AND Status = 'Processed'
+    )
+    BEGIN
+        RAISERROR('HATA: Sistemde bu tarihten daha güncel bir veri zaten yüklü. İşlem reddedildi.', 16, 1);
+        RETURN;
+    END
+
+    -- Sorun yoksa kaydı aç
+    INSERT INTO ImportBatches (FileName, FileTimestamp, UploadedBy, TotalRecords, Status)
+    VALUES (@FileName, @FileTimestamp, @UploadedBy, @TotalRecords, 'Pending');
+
+    SET @BatchID = SCOPE_IDENTITY();
+END;
+GO
+CREATE PROCEDURE sp_ProcessReconciliation
+    @BatchID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        -- 1. Detay tablosuna o anki sistem bakiyesini bilgi amaçlı yaz (Loglama)
+        UPDATE D
+        SET D.SystemBalanceAtTime = C.CurrentBalance
+        FROM ImportDetails D
+        INNER JOIN Customers C ON D.AccountCode = C.AccountCode
+        WHERE D.BatchID = @BatchID;
+
+        -- 2. Müşteri Bakiyelerini DİREKT olarak Excel verisine eşitle (Overwrite)
+        -- Fark hesabı veya Transaction kaydı YOK. Sadece son durum geçerli.
+        UPDATE C
+        SET C.CurrentBalance = D.ExcelBalance
+        FROM Customers C
+        JOIN ImportDetails D ON C.AccountCode = D.AccountCode
+        WHERE D.BatchID = @BatchID;
+
+        -- 3. Batch işlemini tamamlandı olarak işaretle
+        UPDATE ImportBatches SET Status = 'Processed' WHERE BatchID = @BatchID;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW; -- Hatayı C# tarafına fırlat
+    END CATCH
+END;
+GO

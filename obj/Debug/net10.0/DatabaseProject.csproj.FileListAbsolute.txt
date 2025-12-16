@@ -145,4 +145,4 @@ C:\Users\erkan\source\repos\DatabaseProject\bin\Debug\net10.0\ExcelNumberFormat.
 C:\Users\erkan\source\repos\DatabaseProject\bin\Debug\net10.0\RBush.dll
 C:\Users\erkan\source\repos\DatabaseProject\bin\Debug\net10.0\SixLabors.Fonts.dll
 C:\Users\erkan\source\repos\DatabaseProject\bin\Debug\net10.0\System.IO.Packaging.dll
-C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\staticwebassets.upToDateCheck.txt
+C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\DatabaseProject.sourcelink.json

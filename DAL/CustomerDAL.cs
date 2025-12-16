@@ -51,46 +51,96 @@ namespace DatabaseProject.DAL
             return customers;
         }
 
-        public (int SuccessCount, int ErrorCount, List<string> Errors) ParseAndImportReport(string fileContent)
+        public (int SuccessCount, int ErrorCount, string Message) ParseAndImportReport(string fileContent, string fileName, DateTime fileTimestamp, int userId)
         {
             int successCount = 0;
             int errorCount = 0;
-            var errors = new List<string>();
+            int batchId = 0;
 
-            var chunks = Regex.Split(fileContent, @"(?=Cari\s*Kodu)", RegexOptions.IgnoreCase);
-            
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                int chunkIndex = 0;
+                SqlTransaction transaction = conn.BeginTransaction();
 
-                foreach (var chunk in chunks)
+                try
                 {
-                    chunkIndex++;
-                    if (string.IsNullOrWhiteSpace(chunk)) continue;
-                    if (!chunk.Trim().StartsWith("Cari", StringComparison.OrdinalIgnoreCase)) continue;
-
-                    try
+                    // 1. ADIM: Batch Oluştur ve Tarih Kontrolü Yap
+                    using (SqlCommand cmd = new SqlCommand("sp_ValidateAndCreateBatch", conn, transaction))
                     {
-                        var customer = ExtractCustomerFromChunk(chunk);
-                        
-                        if (customer == null || string.IsNullOrWhiteSpace(customer.AccountCode))
-                        {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@FileName", fileName);
+                        cmd.Parameters.AddWithValue("@FileTimestamp", fileTimestamp);
+                        cmd.Parameters.AddWithValue("@UploadedBy", userId);
+                        cmd.Parameters.AddWithValue("@TotalRecords", 0); // Şimdilik 0, döngü bitince güncellenebilir
+
+                        // Output parametresi
+                        SqlParameter outParam = new SqlParameter("@BatchID", SqlDbType.Int);
+                        outParam.Direction = ParameterDirection.Output;
+                        cmd.Parameters.Add(outParam);
+
+                        cmd.ExecuteNonQuery();
+                        batchId = (int)outParam.Value;
+                    }
+
+                    // 2. ADIM: Excel İçeriğini Parse Et ve ImportDetails Tablosuna Ekle
+                    // Not: Regex parse mantığın aynı kalacak, sadece INSERT hedefi değişiyor.
+                    var chunks = Regex.Split(fileContent, @"(?=Cari\s*Kodu)", RegexOptions.IgnoreCase);
+
+                    foreach (var chunk in chunks)
+                    {
+                        if (string.IsNullOrWhiteSpace(chunk) || !chunk.Trim().StartsWith("Cari", StringComparison.OrdinalIgnoreCase))
                             continue;
-                        }
 
-                        SaveCustomerDirect(conn, customer);
-                        successCount++;
+                        var customer = ExtractCustomerFromChunk(chunk); // Mevcut metodun
+                        if (customer != null && !string.IsNullOrWhiteSpace(customer.AccountCode))
+                        {
+                            // Customers tablosuna değil, ImportDetails tablosuna ekle
+                            string insertDetail = @"INSERT INTO ImportDetails (BatchID, AccountCode, DetectedName, ExcelBalance) 
+                                           VALUES (@BatchID, @AccountCode, @DetectedName, @ExcelBalance)";
+
+                            using (SqlCommand detailCmd = new SqlCommand(insertDetail, conn, transaction))
+                            {
+                                detailCmd.Parameters.AddWithValue("@BatchID", batchId);
+                                detailCmd.Parameters.AddWithValue("@AccountCode", customer.AccountCode);
+                                detailCmd.Parameters.AddWithValue("@DetectedName", customer.CompanyName ?? string.Empty);
+                                detailCmd.Parameters.AddWithValue("@ExcelBalance", customer.CurrentBalance);
+                                detailCmd.ExecuteNonQuery();
+                            }
+                            successCount++;
+                        }
+                        else
+                        {
+                            errorCount++;
+                        }
                     }
-                    catch (Exception ex)
+
+                    // 3. ADIM: Eşitleme Prosedürünü Tetikle (Reconciliation)
+                    using (SqlCommand procCmd = new SqlCommand("sp_ProcessReconciliation", conn, transaction))
                     {
-                        errorCount++;
-                        errors.Add($"Blok {chunkIndex}: {ex.Message}");
+                        procCmd.CommandType = CommandType.StoredProcedure;
+                        procCmd.Parameters.AddWithValue("@BatchID", batchId);
+                        procCmd.ExecuteNonQuery();
                     }
+
+                    transaction.Commit();
+                    return (successCount, errorCount, "İşlem başarıyla tamamlandı.");
+                }
+                catch (SqlException ex)
+                {
+                    transaction.Rollback();
+                    // Stored Procedure'den gelen "Eski Tarihli Dosya" hatasını yakala
+                    if (ex.Number == 50000) // RAISERROR ile fırlatılan özel hatalar
+                    {
+                        throw new Exception(ex.Message);
+                    }
+                    throw;
+                }
+                catch (Exception)
+                {
+                    transaction.Rollback();
+                    throw;
                 }
             }
-
-            return (successCount, errorCount, errors);
         }
 
         private Customer? ExtractCustomerFromChunk(string chunk)

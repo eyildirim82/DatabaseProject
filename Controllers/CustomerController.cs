@@ -38,17 +38,42 @@ namespace DatabaseProject.Controllers
 
             var allowedExtensions = new[] { ".txt", ".xlsx", ".xls", ".csv" };
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-            
+
             if (!allowedExtensions.Contains(extension))
             {
                 TempData["ErrorMessage"] = "Sadece .txt, .xlsx, .xls ve .csv dosyaları yüklenebilir.";
                 return View();
             }
 
+            // 1. Dosya isminden tarih parse etme
+            // Beklenen Format: TopluCariEkstreRaporu_20251215142935.xlsx
+            string fileName = Path.GetFileName(file.FileName);
+            DateTime fileTimestamp;
+
+            try
+            {
+                // Regex ile sadece sayısal tarih kısmını al (dosya adı değişse bile çalışır)
+                var match = System.Text.RegularExpressions.Regex.Match(fileName, @"(\d{14})");
+                if (match.Success)
+                {
+                    string datePart = match.Groups[1].Value; // 20251215142935
+                    fileTimestamp = DateTime.ParseExact(datePart, "yyyyMMddHHmmss", null);
+                }
+                else
+                {
+                    fileTimestamp = DateTime.Now; // Tarih bulunamazsa şu anı al (veya hata fırlat)
+                }
+            }
+            catch
+            {
+                TempData["ErrorMessage"] = "Dosya isminde geçerli bir tarih formatı bulunamadı (Örn: _20251215142935).";
+                return View();
+            }
+
             try
             {
                 string fileContent;
-                
+
                 if (extension == ".xlsx" || extension == ".xls")
                 {
                     fileContent = ReadExcelAsText(file);
@@ -67,27 +92,16 @@ namespace DatabaseProject.Controllers
                     return View();
                 }
 
-                var result = _customerDAL.ParseAndImportReport(fileContent);
+                // 2. DAL Çağrısı (Tarih parametresi ile)
+                // UserID'yi şimdilik 1 (Admin) gönderiyoruz, Login sistemi varsa User.Identity'den alabilirsin.
+                var result = _customerDAL.ParseAndImportReport(fileContent, fileName, fileTimestamp, 1);
 
-                if (result.SuccessCount > 0)
-                {
-                    TempData["SuccessMessage"] = $"{result.SuccessCount} müşteri başarıyla aktarıldı!";
-                }
-                if (result.ErrorCount > 0)
-                {
-                    TempData["ErrorMessage"] = $"{result.ErrorCount} blokta hata oluştu.";
-                    TempData["ImportErrors"] = result.Errors.Take(10).ToList();
-                }
-                if (result.SuccessCount == 0 && result.ErrorCount == 0)
-                {
-                    TempData["ErrorMessage"] = "Dosyada işlenebilir müşteri verisi bulunamadı.";
-                    return View();
-                }
+                TempData["SuccessMessage"] = $"{result.SuccessCount} kayıt işlendi. Mutabakat tamamlandı!";
             }
             catch (Exception ex)
             {
-                TempData["ErrorMessage"] = $"Pipeline hatası: {ex.Message}";
-                return View();
+                // SQL'den gelen "Eski Dosya" hatası burada kullanıcıya gösterilecek
+                TempData["ErrorMessage"] = $"İşlem Başarısız: {ex.Message}";
             }
 
             return RedirectToAction(nameof(Index));
