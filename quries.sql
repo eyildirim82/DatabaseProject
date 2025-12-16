@@ -515,7 +515,8 @@ CREATE TABLE ImportDetails (
     
     CONSTRAINT FK_Import_Batch FOREIGN KEY (BatchID) REFERENCES ImportBatches(BatchID)
 );
-GOCREATE PROCEDURE sp_ValidateAndCreateBatch
+GO
+CREATE PROCEDURE sp_ValidateAndCreateBatch
     @FileName NVARCHAR(255),
     @FileTimestamp DATETIME, -- C#'ta dosya isminden parse edilip buraya gelecek
     @UploadedBy INT,
