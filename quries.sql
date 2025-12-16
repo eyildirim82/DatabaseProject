@@ -533,7 +533,9 @@ BEGIN
         AND Status = 'Processed'
     )
     BEGIN
-        RAISERROR('HATA: Sistemde bu tarihten daha güncel bir veri zaten yüklü. İşlem reddedildi.', 16, 1);
+        -- Her ihtimale karşı, çağıran tarafın "bozuk" bir BatchID ile devam etmemesi için
+        SET @BatchID = 0;
+        RAISERROR('HATA: Sistemde bu tarihten daha güncel bir veri zaten yüklü. İşlem reddedildi.', 16, 1) WITH SETERROR;
         RETURN;
     END
 

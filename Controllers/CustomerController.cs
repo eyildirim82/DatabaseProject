@@ -61,7 +61,8 @@ namespace DatabaseProject.Controllers
                 }
                 else
                 {
-                    fileTimestamp = DateTime.Now; // Tarih bulunamazsa şu anı al (veya hata fırlat)
+                    // Bilinçli olarak hata fırlatıyoruz; catch bloğu kullanıcıya mesaj gösterecek
+                    throw new FormatException("Filename does not contain a valid 14-digit datetime.");
                 }
             }
             catch
@@ -96,7 +97,22 @@ namespace DatabaseProject.Controllers
                 // UserID'yi şimdilik 1 (Admin) gönderiyoruz, Login sistemi varsa User.Identity'den alabilirsin.
                 var result = _customerDAL.ParseAndImportReport(fileContent, fileName, fileTimestamp, 1);
 
-                TempData["SuccessMessage"] = $"{result.SuccessCount} kayıt işlendi. Mutabakat tamamlandı!";
+                if (result.SuccessCount > 0 && result.ErrorCount == 0)
+                {
+                    TempData["SuccessMessage"] = $"{result.SuccessCount} kayıt işlendi. Mutabakat tamamlandı!";
+                }
+                else if (result.SuccessCount > 0 && result.ErrorCount > 0)
+                {
+                    TempData["ErrorMessage"] = $"{result.SuccessCount} kayıt işlendi, {result.ErrorCount} kayıt işlenemedi. Lütfen detayları kontrol edin.";
+                }
+                else if (result.SuccessCount == 0 && result.ErrorCount > 0)
+                {
+                    TempData["ErrorMessage"] = $"Tüm kayıtlar işlenemedi ({result.ErrorCount} hata). Lütfen dosya içeriğini kontrol edin.";
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = "Hiçbir kayıt işlenemedi. Lütfen dosya içeriğini kontrol edin.";
+                }
             }
             catch (Exception ex)
             {

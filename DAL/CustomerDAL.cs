@@ -74,12 +74,26 @@ namespace DatabaseProject.DAL
                         cmd.Parameters.AddWithValue("@TotalRecords", 0); // Şimdilik 0, döngü bitince güncellenebilir
 
                         // Output parametresi
-                        SqlParameter outParam = new SqlParameter("@BatchID", SqlDbType.Int);
-                        outParam.Direction = ParameterDirection.Output;
+                        SqlParameter outParam = new SqlParameter("@BatchID", SqlDbType.Int)
+                        {
+                            Direction = ParameterDirection.Output
+                        };
                         cmd.Parameters.Add(outParam);
 
                         cmd.ExecuteNonQuery();
+
+                        // Hata alınmadıysa, BatchID'nin anlamlı bir değer döndüğünden emin ol
+                        if (outParam.Value == DBNull.Value || outParam.Value == null)
+                        {
+                            throw new Exception("Batch oluşturulamadı, BatchID döndürülmedi.");
+                        }
+
                         batchId = (int)outParam.Value;
+
+                        if (batchId <= 0)
+                        {
+                            throw new Exception("Geçersiz BatchID alındı (0 veya negatif). İşlem iptal edildi.");
+                        }
                     }
 
                     // 2. ADIM: Excel İçeriğini Parse Et ve ImportDetails Tablosuna Ekle
@@ -129,7 +143,10 @@ namespace DatabaseProject.DAL
                 {
                     transaction.Rollback();
                     // Stored Procedure'den gelen "Eski Tarihli Dosya" hatasını yakala
-                    if (ex.Number == 50000) // RAISERROR ile fırlatılan özel hatalar
+                    // RAISERROR ile fırlatılan özel hatalar genellikle 50000-50999 arasındadır
+                    // Ayrıca mesaj içeriğine göre de kontrol ediyoruz (daha güvenli)
+                    if ((ex.Number >= 50000 && ex.Number <= 50999) || 
+                        ex.Message.Contains("daha güncel bir veri zaten yüklü"))
                     {
                         throw new Exception(ex.Message);
                     }
