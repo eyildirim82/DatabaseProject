@@ -1,6 +1,6 @@
 @model DatabaseProject.Models.ImportBatchViewModel
 @{
-    ViewData["Title"] = "Excel/Rapor Import (Pipeline)";
+    ViewData["Title"] = "Excel Mutabakat Modülü";
 }
 
 <div class="container-fluid">
@@ -22,59 +22,51 @@
 
     <div class="row">
         <div class="col-12">
+            <!-- Dosya Yükleme Formu -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">
-                        <i class="bi bi-file-earmark-excel me-2"></i>TopluCariEkstreRaporu Yükle
+                        <i class="bi bi-file-earmark-excel me-2"></i>Cari Ekstre Dosyası Yükle
                     </h4>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-primary mb-4">
-                        <i class="bi bi-magic me-2"></i>
-                        <strong>Otomatik Pipeline!</strong>
-                        <hr class="my-2" />
-                        <small>
-                            Bu özellik <strong>TopluCariEkstreRaporu</strong> formatındaki dosyaları otomatik olarak parse eder:<br /><br />
-                            📥 <strong>Dosya Yükle</strong> → 
-                            🔍 <strong>Cari Kodu'na göre böl</strong> → 
-                            📝 <strong>Regex ile ayıkla</strong> → 
-                            💾 <strong>Veritabanına kaydet</strong>
-                        </small>
-                    </div>
-
                     <form asp-action="ImportExcel" method="post" enctype="multipart/form-data">
                         @Html.AntiForgeryToken()
                         
-                        <div class="mb-4">
+                        <div class="mb-3">
                             <label for="file" class="form-label">
-                                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Rapor Dosyası Seçin
+                                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel Dosyası Seçin
                             </label>
                             <input type="file" class="form-control form-control-lg" id="file" name="file" 
                                    accept=".txt,.xlsx,.xls,.csv" required />
-                            <div class="form-text">Desteklenen formatlar: .txt, .xlsx, .xls, .csv</div>
+                            <div class="form-text">
+                                Desteklenen formatlar: .txt, .xlsx, .xls, .csv<br />
+                                Dosya adı formatı: TopluCariEkstreRaporu_yyyyMMddHHmmss.xlsx
+                            </div>
                         </div>
-
-                        <hr class="my-4" />
 
                         <div class="d-flex justify-content-between">
                             <a asp-action="Index" class="btn btn-outline-secondary">
                                 <i class="bi bi-arrow-left me-1"></i>Geri Dön
                             </a>
                             <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-lightning-charge me-1"></i>Pipeline Çalıştır
+                                <i class="bi bi-upload me-1"></i>Dosyayı Yükle
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
 
+            <!-- İstatistikler -->
             @if (Model.Statistics != null)
             {
                 @await Html.PartialAsync("_BatchStatistics", Model.Statistics)
             }
 
+            <!-- Filtreleme Formu -->
             @await Html.PartialAsync("_BatchFilters", Model)
 
+            <!-- Geçmiş Yüklemeler Tablosu -->
             <div class="card shadow-sm">
                 <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
@@ -85,17 +77,17 @@
                            asp-route-format="csv"
                            asp-route-statusFilter="@Model.StatusFilter"
                            asp-route-fileNameFilter="@Model.FileNameFilter"
-                           asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")"
-                           asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")"
-                           class="btn btn-sm btn-light me-2">
+                           asp-route-startDate="@Model.StartDate"
+                           asp-route-endDate="@Model.EndDate"
+                           class="btn btn-sm btn-light">
                             <i class="bi bi-file-earmark-spreadsheet me-1"></i>CSV İndir
                         </a>
                         <a asp-action="ExportHistory" 
                            asp-route-format="excel"
                            asp-route-statusFilter="@Model.StatusFilter"
                            asp-route-fileNameFilter="@Model.FileNameFilter"
-                           asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")"
-                           asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")"
+                           asp-route-startDate="@Model.StartDate"
+                           asp-route-endDate="@Model.EndDate"
                            class="btn btn-sm btn-light">
                             <i class="bi bi-file-earmark-excel me-1"></i>Excel İndir
                         </a>
@@ -112,8 +104,8 @@
                                             <a asp-action="ImportExcel" 
                                                asp-route-statusFilter="@Model.StatusFilter"
                                                asp-route-fileNameFilter="@Model.FileNameFilter"
-                                               asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")"
-                                               asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")"
+                                               asp-route-startDate="@Model.StartDate"
+                                               asp-route-endDate="@Model.EndDate"
                                                asp-route-page="@Model.PageNumber"
                                                asp-route-pageSize="@Model.PageSize"
                                                asp-route-sortBy="BatchID"
@@ -130,8 +122,8 @@
                                             <a asp-action="ImportExcel" 
                                                asp-route-statusFilter="@Model.StatusFilter"
                                                asp-route-fileNameFilter="@Model.FileNameFilter"
-                                               asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")"
-                                               asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")"
+                                               asp-route-startDate="@Model.StartDate"
+                                               asp-route-endDate="@Model.EndDate"
                                                asp-route-page="@Model.PageNumber"
                                                asp-route-pageSize="@Model.PageSize"
                                                asp-route-sortBy="FileName"
@@ -144,13 +136,30 @@
                                                 }
                                             </a>
                                         </th>
-                                        <th>Dosya Tarihi</th>
                                         <th>
                                             <a asp-action="ImportExcel" 
                                                asp-route-statusFilter="@Model.StatusFilter"
                                                asp-route-fileNameFilter="@Model.FileNameFilter"
-                                               asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")"
-                                               asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")"
+                                               asp-route-startDate="@Model.StartDate"
+                                               asp-route-endDate="@Model.EndDate"
+                                               asp-route-page="@Model.PageNumber"
+                                               asp-route-pageSize="@Model.PageSize"
+                                               asp-route-sortBy="FileTimestamp"
+                                               asp-route-sortDirection="@(Model.SortBy == "FileTimestamp" && Model.SortDirection == "ASC" ? "DESC" : "ASC")"
+                                               class="text-decoration-none text-dark">
+                                                Dosya Tarihi
+                                                @if (Model.SortBy == "FileTimestamp")
+                                                {
+                                                    <i class="bi bi-arrow-@(Model.SortDirection == "ASC" ? "up" : "down")"></i>
+                                                }
+                                            </a>
+                                        </th>
+                                        <th>
+                                            <a asp-action="ImportExcel" 
+                                               asp-route-statusFilter="@Model.StatusFilter"
+                                               asp-route-fileNameFilter="@Model.FileNameFilter"
+                                               asp-route-startDate="@Model.StartDate"
+                                               asp-route-endDate="@Model.EndDate"
                                                asp-route-page="@Model.PageNumber"
                                                asp-route-pageSize="@Model.PageSize"
                                                asp-route-sortBy="UploadDate"
@@ -167,8 +176,8 @@
                                             <a asp-action="ImportExcel" 
                                                asp-route-statusFilter="@Model.StatusFilter"
                                                asp-route-fileNameFilter="@Model.FileNameFilter"
-                                               asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")"
-                                               asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")"
+                                               asp-route-startDate="@Model.StartDate"
+                                               asp-route-endDate="@Model.EndDate"
                                                asp-route-page="@Model.PageNumber"
                                                asp-route-pageSize="@Model.PageSize"
                                                asp-route-sortBy="TotalRecords"
@@ -181,7 +190,24 @@
                                                 }
                                             </a>
                                         </th>
-                                        <th>Durum</th>
+                                        <th>
+                                            <a asp-action="ImportExcel" 
+                                               asp-route-statusFilter="@Model.StatusFilter"
+                                               asp-route-fileNameFilter="@Model.FileNameFilter"
+                                               asp-route-startDate="@Model.StartDate"
+                                               asp-route-endDate="@Model.EndDate"
+                                               asp-route-page="@Model.PageNumber"
+                                               asp-route-pageSize="@Model.PageSize"
+                                               asp-route-sortBy="Status"
+                                               asp-route-sortDirection="@(Model.SortBy == "Status" && Model.SortDirection == "ASC" ? "DESC" : "ASC")"
+                                               class="text-decoration-none text-dark">
+                                                Durum
+                                                @if (Model.SortBy == "Status")
+                                                {
+                                                    <i class="bi bi-arrow-@(Model.SortDirection == "ASC" ? "up" : "down")"></i>
+                                                }
+                                            </a>
+                                        </th>
                                         <th>İşlemler</th>
                                     </tr>
                                 </thead>
@@ -190,7 +216,7 @@
                                     {
                                         <tr>
                                             <td>
-                                                <a asp-action="BatchDetails" asp-route-id="@batch.BatchID" class="text-decoration-none">
+                                                <a asp-action="BatchDetails" asp-route-id="@batch.BatchID" class="text-primary text-decoration-none fw-bold">
                                                     @batch.BatchID
                                                 </a>
                                             </td>
@@ -203,7 +229,7 @@
                                                     string badgeClass = batch.Status switch
                                                     {
                                                         "Processed" => "bg-success",
-                                                        "Pending" => "bg-warning",
+                                                        "Pending" => "bg-warning text-dark",
                                                         "Rejected" => "bg-danger",
                                                         _ => "bg-secondary"
                                                     };
@@ -212,29 +238,21 @@
                                             </td>
                                             <td>
                                                 <div class="btn-group btn-group-sm" role="group">
-                                                    <a asp-action="BatchDetails" asp-route-id="@batch.BatchID" 
-                                                       class="btn btn-outline-primary" title="Detaylar">
-                                                        <i class="bi bi-eye"></i>
-                                                    </a>
                                                     @if (batch.Status == "Pending")
                                                     {
-                                                        <form asp-action="UpdateBatchStatus" method="post" class="d-inline">
+                                                        <form asp-action="UpdateBatchStatus" method="post" class="d-inline" onsubmit="return confirm('Bu batch\'i iptal etmek istediğinizden emin misiniz?');">
                                                             @Html.AntiForgeryToken()
                                                             <input type="hidden" name="batchId" value="@batch.BatchID" />
                                                             <input type="hidden" name="status" value="Rejected" />
-                                                            <button type="submit" class="btn btn-outline-warning" 
-                                                                    title="İptal Et" 
-                                                                    onclick="return confirm('Bu batch\'i iptal etmek istediğinize emin misiniz?');">
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm" title="İptal Et">
                                                                 <i class="bi bi-x-circle"></i>
                                                             </button>
                                                         </form>
                                                     }
-                                                    <form asp-action="DeleteBatch" method="post" class="d-inline">
+                                                    <form asp-action="DeleteBatch" method="post" class="d-inline" onsubmit="return confirm('Bu batch\'i silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!');">
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="batchId" value="@batch.BatchID" />
-                                                        <button type="submit" class="btn btn-outline-danger" 
-                                                                title="Sil" 
-                                                                onclick="return confirm('Bu batch\'i silmek istediğinize emin misiniz? Bu işlem geri alınamaz!');">
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Sil">
                                                             <i class="bi bi-trash"></i>
                                                         </button>
                                                     </form>
@@ -246,67 +264,26 @@
                             </table>
                         </div>
 
-                        <div class="d-flex justify-content-between align-items-center mt-3">
-                            <div>
-                                <span class="text-muted">
-                                    Toplam <strong>@Model.TotalRecords</strong> kayıt bulundu.
-                                    Sayfa <strong>@Model.PageNumber</strong> / <strong>@Model.TotalPages</strong>
-                                </span>
-                                <select name="pageSize" class="form-select form-select-sm d-inline-block ms-2" style="width: auto;" 
-                                        onchange="location.href='@Url.Action("ImportExcel", new { statusFilter = Model.StatusFilter, fileNameFilter = Model.FileNameFilter, startDate = Model.StartDate?.ToString("yyyy-MM-dd"), endDate = Model.EndDate?.ToString("yyyy-MM-dd"), page = 1, pageSize = "__VALUE__", sortBy = Model.SortBy, sortDirection = Model.SortDirection })'.replace('__VALUE__', this.value)">
-                                    @if (Model.PageSize == 10)
-                                    {
-                                        <option value="10" selected>10</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="10">10</option>
-                                    }
-                                    @if (Model.PageSize == 25)
-                                    {
-                                        <option value="25" selected>25</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="25">25</option>
-                                    }
-                                    @if (Model.PageSize == 50)
-                                    {
-                                        <option value="50" selected>50</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="50">50</option>
-                                    }
-                                    @if (Model.PageSize == 100)
-                                    {
-                                        <option value="100" selected>100</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="100">100</option>
-                                    }
-                                </select>
-                            </div>
-                            <nav>
-                                <ul class="pagination pagination-sm mb-0">
-                                    @if (Model.PageNumber > 1)
-                                    {
-                                        <li class="page-item">
-                                            <a class="page-link" 
-                                               asp-action="ImportExcel"
-                                               asp-route-statusFilter="@Model.StatusFilter"
-                                               asp-route-fileNameFilter="@Model.FileNameFilter"
-                                               asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")"
-                                               asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")"
-                                               asp-route-page="@(Model.PageNumber - 1)"
-                                               asp-route-pageSize="@Model.PageSize"
-                                               asp-route-sortBy="@Model.SortBy"
-                                               asp-route-sortDirection="@Model.SortDirection">
-                                                Önceki
-                                            </a>
-                                        </li>
-                                    }
+                        <!-- Sayfalama -->
+                        @if (Model.TotalPages > 1)
+                        {
+                            <nav aria-label="Sayfa navigasyonu">
+                                <ul class="pagination justify-content-center">
+                                    <li class="page-item @(Model.PageNumber == 1 ? "disabled" : "")">
+                                        <a class="page-link" 
+                                           asp-action="ImportExcel"
+                                           asp-route-statusFilter="@Model.StatusFilter"
+                                           asp-route-fileNameFilter="@Model.FileNameFilter"
+                                           asp-route-startDate="@Model.StartDate"
+                                           asp-route-endDate="@Model.EndDate"
+                                           asp-route-page="@(Model.PageNumber - 1)"
+                                           asp-route-pageSize="@Model.PageSize"
+                                           asp-route-sortBy="@Model.SortBy"
+                                           asp-route-sortDirection="@Model.SortDirection">
+                                            <i class="bi bi-chevron-left"></i>
+                                        </a>
+                                    </li>
+                                    
                                     @for (int i = Math.Max(1, Model.PageNumber - 2); i <= Math.Min(Model.TotalPages, Model.PageNumber + 2); i++)
                                     {
                                         <li class="page-item @(i == Model.PageNumber ? "active" : "")">
@@ -314,8 +291,8 @@
                                                asp-action="ImportExcel"
                                                asp-route-statusFilter="@Model.StatusFilter"
                                                asp-route-fileNameFilter="@Model.FileNameFilter"
-                                               asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")"
-                                               asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")"
+                                               asp-route-startDate="@Model.StartDate"
+                                               asp-route-endDate="@Model.EndDate"
                                                asp-route-page="@i"
                                                asp-route-pageSize="@Model.PageSize"
                                                asp-route-sortBy="@Model.SortBy"
@@ -324,26 +301,44 @@
                                             </a>
                                         </li>
                                     }
-                                    @if (Model.PageNumber < Model.TotalPages)
-                                    {
-                                        <li class="page-item">
-                                            <a class="page-link" 
-                                               asp-action="ImportExcel"
-                                               asp-route-statusFilter="@Model.StatusFilter"
-                                               asp-route-fileNameFilter="@Model.FileNameFilter"
-                                               asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")"
-                                               asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")"
-                                               asp-route-page="@(Model.PageNumber + 1)"
-                                               asp-route-pageSize="@Model.PageSize"
-                                               asp-route-sortBy="@Model.SortBy"
-                                               asp-route-sortDirection="@Model.SortDirection">
-                                                Sonraki
-                                            </a>
-                                        </li>
-                                    }
+                                    
+                                    <li class="page-item @(Model.PageNumber == Model.TotalPages ? "disabled" : "")">
+                                        <a class="page-link" 
+                                           asp-action="ImportExcel"
+                                           asp-route-statusFilter="@Model.StatusFilter"
+                                           asp-route-fileNameFilter="@Model.FileNameFilter"
+                                           asp-route-startDate="@Model.StartDate"
+                                           asp-route-endDate="@Model.EndDate"
+                                           asp-route-page="@(Model.PageNumber + 1)"
+                                           asp-route-pageSize="@Model.PageSize"
+                                           asp-route-sortBy="@Model.SortBy"
+                                           asp-route-sortDirection="@Model.SortDirection">
+                                            <i class="bi bi-chevron-right"></i>
+                                        </a>
+                                    </li>
                                 </ul>
                             </nav>
-                        </div>
+                            
+                            <div class="text-center mt-2">
+                                <small class="text-muted">
+                                    Toplam @Model.TotalRecords kayıt bulundu. 
+                                    Sayfa @Model.PageNumber / @Model.TotalPages
+                                    <select name="pageSize" class="form-select form-select-sm d-inline-block w-auto ms-2" onchange="changePageSize(this.value)">
+                                        <option value="10" selected="@(Model.PageSize == 10)">10</option>
+                                        <option value="25" selected="@(Model.PageSize == 25)">25</option>
+                                        <option value="50" selected="@(Model.PageSize == 50)">50</option>
+                                        <option value="100" selected="@(Model.PageSize == 100)">100</option>
+                                    </select>
+                                    kayıt göster
+                                </small>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center mt-2">
+                                <small class="text-muted">Toplam @Model.TotalRecords kayıt bulundu.</small>
+                            </div>
+                        }
                     }
                     else
                     {
@@ -353,30 +348,34 @@
                     }
                 </div>
             </div>
-
-            <div class="card mt-4 border-primary">
-                <div class="card-header bg-light">
-                    <i class="bi bi-info-circle me-2"></i>Beklenen Dosya Formatı
-                </div>
-                <div class="card-body small">
-                    <p>Dosya içinde her müşteri bloğu şu şekilde başlamalıdır:</p>
-                    <pre class="bg-light p-2 rounded mb-0"><code>Cari Kodu: 120-001-0001
-Cari Adı: ABC TİCARET LTD. ŞTİ.
-Telefon: 0212 555 1234
-Adres: İstanbul, Türkiye
-Borç Bakiye: 15.750,00
-Alacak Bakiye: 0,00</code></pre>
-                </div>
-            </div>
         </div>
     </div>
 </div>
 
 <style>
-    .table th a:hover {
-        text-decoration: underline !important;
+    .table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        white-space: nowrap;
     }
     .table td {
         vertical-align: middle;
     }
+    .table th a {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
 </style>
+
+<script>
+    function changePageSize(pageSize) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('pageSize', pageSize);
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    }
+</script>

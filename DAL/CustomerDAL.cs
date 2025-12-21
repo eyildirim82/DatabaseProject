@@ -51,12 +51,125 @@ namespace DatabaseProject.DAL
             return customers;
         }
 
-        public List<ImportBatch> GetImportHistory()
+        /// <summary>
+        /// Geçmiş yüklemeleri getirir (en son 20 kayıt) - Async versiyon
+        /// </summary>
+        public async Task<List<ImportBatch>> GetImportHistoryAsync()
         {
-            return GetImportHistory(null, null, null, null, 1, 10, "UploadDate", "DESC", out _);
+            var batches = new List<ImportBatch>();
+
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+                
+                string query = @"SELECT TOP 20 BatchID, FileName, FileTimestamp, UploadDate, TotalRecords, Status 
+                                FROM ImportBatches 
+                                ORDER BY UploadDate DESC";
+
+                using (var cmd = new SqlCommand(query, connection))
+                {
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            batches.Add(new ImportBatch
+                            {
+                                BatchID = reader.GetInt32(reader.GetOrdinal("BatchID")),
+                                FileName = reader.GetString(reader.GetOrdinal("FileName")),
+                                FileTimestamp = reader.GetDateTime(reader.GetOrdinal("FileTimestamp")),
+                                UploadDate = reader.GetDateTime(reader.GetOrdinal("UploadDate")),
+                                TotalRecords = reader.GetInt32(reader.GetOrdinal("TotalRecords")),
+                                Status = reader.GetString(reader.GetOrdinal("Status"))
+                            });
+                        }
+                    }
+                }
+            }
+
+            return batches;
         }
 
-        public List<ImportBatch> GetImportHistory(string? statusFilter, string? fileNameFilter, 
+        /// <summary>
+        /// Geçmiş yüklemeleri getirir (en son 20 kayıt) - Basit versiyon
+        /// </summary>
+        public async Task<List<ImportBatch>> GetImportHistory()
+        {
+            return await GetImportHistoryAsync();
+        }
+
+        /// <summary>
+        /// ImportBatch kaydı oluşturur (sp_ValidateAndCreateBatch prosedürünü çağırır)
+        /// </summary>
+        /// <param name="fileName">Dosya adı</param>
+        /// <param name="fileTimestamp">Dosya isminden parse edilen tarih</param>
+        /// <param name="userId">Yükleyen kullanıcı ID</param>
+        /// <param name="totalRecords">Toplam kayıt sayısı</param>
+        /// <returns>Oluşturulan BatchID</returns>
+        public async Task<int> CreateImportBatchAsync(string fileName, DateTime fileTimestamp, int userId, int totalRecords)
+        {
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+
+                using (var cmd = new SqlCommand("sp_ValidateAndCreateBatch", connection))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@FileName", fileName);
+                    cmd.Parameters.AddWithValue("@FileTimestamp", fileTimestamp);
+                    cmd.Parameters.AddWithValue("@UploadedBy", userId);
+                    cmd.Parameters.AddWithValue("@TotalRecords", totalRecords);
+
+                    // Output parametresi
+                    var outParam = new SqlParameter("@BatchID", SqlDbType.Int)
+                    {
+                        Direction = ParameterDirection.Output
+                    };
+                    cmd.Parameters.Add(outParam);
+
+                    try
+                    {
+                        await cmd.ExecuteNonQueryAsync();
+
+                        if (outParam.Value == DBNull.Value || outParam.Value == null)
+                        {
+                            throw new Exception("Batch oluşturulamadı, BatchID döndürülmedi.");
+                        }
+
+                        int batchId = (int)outParam.Value;
+
+                        if (batchId <= 0)
+                        {
+                            throw new Exception("Geçersiz BatchID alındı (0 veya negatif). İşlem iptal edildi.");
+                        }
+
+                        return batchId;
+                    }
+                    catch (SqlException ex)
+                    {
+                        // Stored Procedure'den gelen özel hataları yakala
+                        if ((ex.Number >= 50000 && ex.Number <= 50999) ||
+                            ex.Message.Contains("daha güncel bir veri zaten yüklü"))
+                        {
+                            throw new Exception(ex.Message);
+                        }
+                        throw;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Filtrelenmiş ve sayfalanmış geçmiş yüklemeleri getirir (eski versiyon - filtreleme için)
+        /// </summary>
+        public List<ImportBatch> GetImportHistoryWithFilters()
+        {
+            return GetImportHistoryWithFilters(null, null, null, null, 1, 10, "UploadDate", "DESC", out _);
+        }
+
+        /// <summary>
+        /// Filtrelenmiş ve sayfalanmış geçmiş yüklemeleri getirir (eski versiyon - filtreleme için)
+        /// </summary>
+        public List<ImportBatch> GetImportHistoryWithFilters(string? statusFilter, string? fileNameFilter, 
             DateTime? startDate, DateTime? endDate, int pageNumber, int pageSize, 
             string sortBy, string sortDirection, out int totalRecords)
         {

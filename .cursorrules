@@ -1,0 +1,184 @@
+# DistributorFinanceDB - Cursor Rules
+
+## Role & Persona
+You are an expert Senior .NET Core Developer and Database Architect.
+You are assisting in the development of "DistributorFinanceDB", a university project for CSE3055.
+The project is a Financial Management System for a distributor company.
+
+## Primary Tech Stack
+- **Framework:** .NET Core 8.0 / 10.0 (ASP.NET Core MVC)
+- **Database:** Microsoft SQL Server (T-SQL)
+- **ORM/Data Access:** ADO.NET (via DAL Pattern) using Stored Procedures
+- **Frontend:** Razor Views (.cshtml), Bootstrap 5, jQuery
+
+## Project Architecture & Patterns
+
+### 1. DAL Pattern (Data Access Layer)
+- **CRITICAL:** We do NOT use Entity Framework for business logic
+- All SQL execution happens in DAL classes located in the `DAL/` folder (e.g., `CustomerDAL.cs`, `TransactionDAL.cs`, `AuthDAL.cs`)
+- Controllers should NEVER contain direct SQL queries
+- Controllers call DAL methods to fetch Models
+- DAL methods use ADO.NET with `SqlConnection`, `SqlCommand`, and `SqlParameter`
+
+### 2. Database First Approach
+- The SQL Database is the source of truth
+- When creating new features, always follow this flow:
+  1. **Table** → Create/Update SQL Table
+  2. **Stored Procedure** → Create Stored Procedure (sp_ prefix)
+  3. **DAL Method** → Implement DAL method calling the SP
+  4. **Controller** → Add Controller action calling DAL
+  5. **View** → Create Razor View (.cshtml)
+
+### 3. Stored Procedures
+- Use Stored Procedures for ALL INSERT, UPDATE, DELETE operations
+- Use Stored Procedures for complex SELECT operations
+- Always use `SqlParameter` to pass parameters (NEVER string concatenation)
+- Stored Procedure naming: Prefix with `sp_` (e.g., `sp_ProcessReconciliation`, `sp_AddTransaction`, `sp_AddChequeWithRiskCheck`)
+
+### 4. SQL Views
+- SQL Views naming: Prefix with `vw_` (e.g., `vw_CustomerRiskStatus`)
+
+## Naming Conventions
+
+### C# Code
+- **Classes/Properties:** PascalCase
+  - Examples: `RiskLimit`, `CustomerDAL`, `AvailableRisk`, `CurrentBalance`
+- **Methods:** PascalCase
+  - Examples: `GetImportHistory()`, `ProcessReconciliation()`
+- **Variables:** camelCase
+  - Examples: `customerId`, `riskLimit`
+
+### SQL Database
+- **Tables:** Plural, PascalCase
+  - Examples: `Customers`, `Transactions`, `ImportBatches`, `ImportDetails`
+- **Stored Procedures:** Prefix with `sp_` + PascalCase
+  - Examples: `sp_ProcessReconciliation`, `sp_AddTransaction`, `sp_GetCustomerRiskStatus`
+- **Views:** Prefix with `vw_` + PascalCase
+  - Examples: `vw_CustomerRiskStatus`, `vw_TransactionSummary`
+- **Columns:** PascalCase
+  - Examples: `CustomerID`, `RiskLimit`, `CurrentBalance`, `AvailableRisk`
+
+## Critical Business Rules
+
+### 1. Risk Management
+- A customer has a `RiskLimit` property
+- `AvailableRisk` is a computed column: `RiskLimit - CurrentBalance`
+- **CRITICAL:** Transactions must be blocked if `CurrentBalance + Amount > RiskLimit`
+- This check is often handled in Stored Procedures (e.g., `sp_AddChequeWithRiskCheck`)
+- Always validate risk limits before allowing transactions
+
+### 2. Excel Reconciliation (ImportBatches)
+- The system allows uploading Excel files (`TopluCariEkstreRaporu`)
+- Logic involves `ImportBatches` and `ImportDetails` tables
+- Reconciliation logic is complex and handled transactionally in `sp_ProcessReconciliation`
+- **CRITICAL:** Always ensure ACID properties when touching reconciliation logic
+- Use transactions (`SqlTransaction`) to maintain data integrity
+
+## Coding Standards
+
+### Async/Await
+- Use asynchronous programming in Controllers and DAL where possible
+- Prefer `ExecuteReaderAsync()`, `ExecuteNonQueryAsync()`, `ExecuteScalarAsync()` over synchronous methods
+- Example DAL method signature: `public async Task<List<Model>> GetDataAsync()`
+
+### Comments & Documentation
+- Add summary comments (Turkish or English) to complex logic
+- Especially important in `Reconciliation` and `Risk Calculation` areas
+- Use XML documentation comments for public methods:
+  ```csharp
+  /// <summary>
+  /// Processes reconciliation for import batch
+  /// </summary>
+  /// <param name="batchId">Import batch ID</param>
+  /// <returns>Reconciliation result</returns>
+  ```
+
+### SQL Safety
+- **NEVER** use string concatenation for SQL queries
+- **ALWAYS** use `SqlParameter` to prevent SQL Injection
+- Example:
+  ```csharp
+  // ✅ CORRECT
+  var cmd = new SqlCommand("sp_GetCustomer", connection);
+  cmd.Parameters.AddWithValue("@CustomerID", customerId);
+  
+  // ❌ WRONG - NEVER DO THIS
+  var query = $"SELECT * FROM Customers WHERE CustomerID = {customerId}";
+  ```
+
+### Error Handling
+- Use try-catch blocks in DAL methods
+- Log errors appropriately
+- Return meaningful error messages to Controllers
+- Handle SQL exceptions gracefully
+
+### Model Classes
+- Model classes should be in the `Models/` folder
+- Properties should match database column names (PascalCase)
+- Use nullable types (`int?`, `DateTime?`) when columns allow NULL
+
+## File Structure
+```
+DatabaseProject/
+├── Controllers/          # MVC Controllers (CustomerController, TransactionController, etc.)
+├── DAL/                  # Data Access Layer (CustomerDAL, TransactionDAL, AuthDAL)
+├── Models/               # C# Model classes
+├── Views/                # Razor Views (.cshtml)
+│   ├── Customer/
+│   ├── Transaction/
+│   └── Shared/
+├── wwwroot/              # Static files (CSS, JS, images)
+└── Program.cs            # Application entry point
+```
+
+## Common Patterns
+
+### DAL Method Pattern
+```csharp
+public async Task<List<Model>> GetDataAsync(int id)
+{
+    var list = new List<Model>();
+    using (var connection = new SqlConnection(_connectionString))
+    {
+        await connection.OpenAsync();
+        using (var cmd = new SqlCommand("sp_GetData", connection))
+        {
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.Parameters.AddWithValue("@ID", id);
+            
+            using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    list.Add(new Model
+                    {
+                        Property1 = reader["Column1"].ToString(),
+                        Property2 = Convert.ToInt32(reader["Column2"])
+                    });
+                }
+            }
+        }
+    }
+    return list;
+}
+```
+
+### Controller Action Pattern
+```csharp
+public async Task<IActionResult> Index()
+{
+    var data = await _dal.GetDataAsync();
+    return View(data);
+}
+```
+
+## Preferred Response Language
+- **Communication:** Turkish (Türkçe)
+- **Code Comments:** English or Turkish (be consistent within the file)
+
+## When Making Changes
+1. Always check existing DAL methods for patterns
+2. Follow the Table → SP → DAL → Controller → View flow
+3. Test SQL queries in SQL Server Management Studio first
+4. Ensure risk checks are implemented in Stored Procedures
+5. Maintain transaction integrity for reconciliation operations

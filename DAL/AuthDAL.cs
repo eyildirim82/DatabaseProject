@@ -1,10 +1,10 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Security.Cryptography;
 using System.Text;
 using System.Data;
-using CSE3055Project.Models;
+using DatabaseProject.Models;
 
-namespace CSE3055Project.DAL
+namespace DatabaseProject.DAL
 {
     public class AuthDAL
     {

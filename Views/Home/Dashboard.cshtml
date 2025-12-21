@@ -1,0 +1,262 @@
+@model DatabaseProject.Models.DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">
+                <i class="bi bi-speedometer2 me-2"></i>Dashboard
+            </h2>
+        </div>
+    </div>
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <!-- Özet İstatistikler -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm border-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Toplam Müşteri</h6>
+                            <h3 class="mb-0">@Model.Stats.TotalCustomers</h3>
+                        </div>
+                        <div class="text-primary" style="font-size: 2.5rem;">
+                            <i class="bi bi-people-fill"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm border-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Bugünkü Tahsilat</h6>
+                            <h3 class="mb-0">@Model.Stats.TodayCollection.ToString("N2") ₺</h3>
+                        </div>
+                        <div class="text-success" style="font-size: 2.5rem;">
+                            <i class="bi bi-cash-coin"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm border-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-2">Bekleyen Çekler</h6>
+                            <h3 class="mb-0">@Model.Stats.PendingCheques</h3>
+                        </div>
+                        <div class="text-warning" style="font-size: 2.5rem;">
+                            <i class="bi bi-receipt-cutoff"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grafikler -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-pie-chart me-2"></i>Risk Durumu Dağılımı
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="riskStatusChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-graph-up me-2"></i>Son 30 Günlük Nakit Akışı
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="cashFlowChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Risk Durumu Detay Tablosu -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-table me-2"></i>Müşteri Risk Durumları
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Müşteri</th>
+                                    <th>Risk Limiti</th>
+                                    <th>Mevcut Bakiye</th>
+                                    <th>Kullanılabilir Limit</th>
+                                    <th>Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var customer in Model.CustomerRiskStatuses)
+                                {
+                                    <tr>
+                                        <td>@customer.CompanyName</td>
+                                        <td>@customer.RiskLimit.ToString("N2") ₺</td>
+                                        <td>@customer.CurrentBalance.ToString("N2") ₺</td>
+                                        <td>@customer.AvailableLimit.ToString("N2") ₺</td>
+                                        <td>
+                                            @if (customer.RiskStatus == "Safe")
+                                            {
+                                                <span class="badge bg-success">@customer.RiskStatus</span>
+                                            }
+                                            else if (customer.RiskStatus == "Critical")
+                                            {
+                                                <span class="badge bg-warning">@customer.RiskStatus</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger">@customer.RiskStatus</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Risk Status Pie Chart
+        const riskStatusData = @Html.Raw(Json.Serialize(Model.RiskStatusDistribution));
+        const riskStatusLabels = riskStatusData.map(item => item.riskStatus);
+        const riskStatusCounts = riskStatusData.map(item => item.count);
+        
+        const riskStatusColors = riskStatusLabels.map(status => {
+            if (status === 'Safe') return 'rgba(40, 167, 69, 0.8)';
+            if (status === 'Critical') return 'rgba(255, 193, 7, 0.8)';
+            return 'rgba(220, 53, 69, 0.8)';
+        });
+
+        const riskStatusCtx = document.getElementById('riskStatusChart').getContext('2d');
+        new Chart(riskStatusCtx, {
+            type: 'pie',
+            data: {
+                labels: riskStatusLabels,
+                datasets: [{
+                    data: riskStatusCounts,
+                    backgroundColor: riskStatusColors,
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += context.parsed + ' müşteri';
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Daily Cash Flow Line Chart
+        const cashFlowData = @Html.Raw(Json.Serialize(Model.DailyCashFlow));
+        
+        // Tarihleri grupla ve topla
+        const dateGroups = {};
+        cashFlowData.forEach(item => {
+            const date = new Date(item.paymentDate).toLocaleDateString('tr-TR');
+            if (!dateGroups[date]) {
+                dateGroups[date] = 0;
+            }
+            dateGroups[date] += parseFloat(item.totalAmount);
+        });
+
+        const cashFlowDates = Object.keys(dateGroups).sort();
+        const cashFlowAmounts = cashFlowDates.map(date => dateGroups[date]);
+
+        const cashFlowCtx = document.getElementById('cashFlowChart').getContext('2d');
+        new Chart(cashFlowCtx, {
+            type: 'line',
+            data: {
+                labels: cashFlowDates,
+                datasets: [{
+                    label: 'Toplam Tahsilat (₺)',
+                    data: cashFlowAmounts,
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString('tr-TR') + ' ₺';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+}

@@ -1,4 +1,4 @@
-﻿namespace CSE3055Project.Models
+namespace DatabaseProject.Models
 {
     public class UserLoginModel
     {

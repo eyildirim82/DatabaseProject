@@ -3,6 +3,7 @@ using DatabaseProject.DAL;
 using DatabaseProject.Models;
 using ClosedXML.Excel;
 using System.Linq;
+using Microsoft.AspNetCore.Http;
 
 namespace DatabaseProject.Controllers
 {
@@ -26,37 +27,54 @@ namespace DatabaseProject.Controllers
             DateTime? startDate, DateTime? endDate, int page = 1, int pageSize = 10, 
             string sortBy = "UploadDate", string sortDirection = "DESC")
         {
-            var viewModel = new ImportBatchViewModel
+            try
             {
-                StatusFilter = statusFilter,
-                FileNameFilter = fileNameFilter,
-                StartDate = startDate,
-                EndDate = endDate,
-                PageNumber = page,
-                PageSize = pageSize,
-                SortBy = sortBy,
-                SortDirection = sortDirection
-            };
+                // İstatistikleri al
+                var statistics = _customerDAL.GetBatchStatistics();
 
-            int totalRecords;
-            viewModel.Batches = _customerDAL.GetImportHistory(
-                statusFilter, fileNameFilter, startDate, endDate,
-                page, pageSize, sortBy, sortDirection, out totalRecords);
-            
-            viewModel.TotalRecords = totalRecords;
-            viewModel.Statistics = _customerDAL.GetBatchStatistics();
+                // Filtrelenmiş ve sayfalanmış verileri al
+                int totalRecords;
+                var batches = _customerDAL.GetImportHistoryWithFilters(
+                    statusFilter, fileNameFilter, startDate, endDate,
+                    page, pageSize, sortBy, sortDirection, out totalRecords);
 
-            return View(viewModel);
+                // ViewModel oluştur
+                var viewModel = new ImportBatchViewModel
+                {
+                    Batches = batches,
+                    StatusFilter = statusFilter,
+                    FileNameFilter = fileNameFilter,
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    PageNumber = page,
+                    PageSize = pageSize,
+                    TotalRecords = totalRecords,
+                    SortBy = sortBy,
+                    SortDirection = sortDirection,
+                    Statistics = statistics
+                };
+
+                return View(viewModel);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Hata: {ex.Message}";
+                return View(new ImportBatchViewModel 
+                { 
+                    Batches = new List<ImportBatch>(),
+                    Statistics = _customerDAL.GetBatchStatistics()
+                });
+            }
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult ImportExcel(IFormFile file)
+        public async Task<IActionResult> ImportExcel(IFormFile file)
         {
             if (file == null || file.Length == 0)
             {
                 TempData["ErrorMessage"] = "Lütfen bir dosya seçin.";
-                return View();
+                return RedirectToAction(nameof(ImportExcel));
             }
 
             var allowedExtensions = new[] { ".txt", ".xlsx", ".xls", ".csv" };
@@ -65,11 +83,11 @@ namespace DatabaseProject.Controllers
             if (!allowedExtensions.Contains(extension))
             {
                 TempData["ErrorMessage"] = "Sadece .txt, .xlsx, .xls ve .csv dosyaları yüklenebilir.";
-                return View();
+                return RedirectToAction(nameof(ImportExcel));
             }
 
-            // 1. Dosya isminden tarih parse etme
-            // Beklenen Format: TopluCariEkstreRaporu_20251215142935.xlsx
+            // Dosya isminden tarih parse etme
+            // Beklenen Format: TopluCariEkstreRaporu_yyyyMMddHHmmss.xlsx
             string fileName = Path.GetFileName(file.FileName);
             DateTime fileTimestamp;
 
@@ -84,66 +102,66 @@ namespace DatabaseProject.Controllers
                 }
                 else
                 {
-                    // Bilinçli olarak hata fırlatıyoruz; catch bloğu kullanıcıya mesaj gösterecek
-                    throw new FormatException("Filename does not contain a valid 14-digit datetime.");
+                    TempData["ErrorMessage"] = "Dosya isminde geçerli bir tarih formatı bulunamadı (Örn: TopluCariEkstreRaporu_20251215142935.xlsx).";
+                    return RedirectToAction(nameof(ImportExcel));
                 }
             }
             catch
             {
                 TempData["ErrorMessage"] = "Dosya isminde geçerli bir tarih formatı bulunamadı (Örn: _20251215142935).";
-                return View();
+                return RedirectToAction(nameof(ImportExcel));
             }
 
             try
             {
-                string fileContent;
-
+                // Excel dosyasını oku ve satır sayısını hesapla
+                int totalRecords = 0;
+                
                 if (extension == ".xlsx" || extension == ".xls")
                 {
-                    fileContent = ReadExcelAsText(file);
+                    using (var stream = file.OpenReadStream())
+                    using (var workbook = new XLWorkbook(stream))
+                    {
+                        foreach (var worksheet in workbook.Worksheets)
+                        {
+                            var usedRange = worksheet.RangeUsed();
+                            if (usedRange != null)
+                            {
+                                totalRecords = usedRange.RowCount();
+                            }
+                        }
+                    }
                 }
                 else
                 {
+                    // Text dosyaları için satır sayısını hesapla
                     using (var reader = new StreamReader(file.OpenReadStream(), System.Text.Encoding.UTF8, true))
                     {
-                        fileContent = reader.ReadToEnd();
+                        while (await reader.ReadLineAsync() != null)
+                        {
+                            totalRecords++;
+                        }
                     }
                 }
 
-                if (string.IsNullOrWhiteSpace(fileContent) || fileContent.Length < 50)
+                // UserID'yi Session'dan al (Session yoksa veya UserID yoksa default 1 kullan)
+                int userId = 1; // Default Admin user ID
+                if (HttpContext.Session != null && HttpContext.Session.IsAvailable)
                 {
-                    TempData["ErrorMessage"] = "Dosya boş veya geçersiz format.";
-                    return View();
+                    userId = HttpContext.Session.GetInt32("UserID") ?? 1;
                 }
 
-                // 2. DAL Çağrısı (Tarih parametresi ile)
-                // UserID'yi şimdilik 1 (Admin) gönderiyoruz, Login sistemi varsa User.Identity'den alabilirsin.
-                var result = _customerDAL.ParseAndImportReport(fileContent, fileName, fileTimestamp, 1);
+                // DAL'daki CreateImportBatch metodunu çağır
+                int batchId = await _customerDAL.CreateImportBatchAsync(fileName, fileTimestamp, userId, totalRecords);
 
-                if (result.SuccessCount > 0 && result.ErrorCount == 0)
-                {
-                    TempData["SuccessMessage"] = $"{result.SuccessCount} kayıt işlendi. Mutabakat tamamlandı!";
-                }
-                else if (result.SuccessCount > 0 && result.ErrorCount > 0)
-                {
-                    TempData["ErrorMessage"] = $"{result.SuccessCount} kayıt işlendi, {result.ErrorCount} kayıt işlenemedi. Lütfen detayları kontrol edin.";
-                }
-                else if (result.SuccessCount == 0 && result.ErrorCount > 0)
-                {
-                    TempData["ErrorMessage"] = $"Tüm kayıtlar işlenemedi ({result.ErrorCount} hata). Lütfen dosya içeriğini kontrol edin.";
-                }
-                else
-                {
-                    TempData["ErrorMessage"] = "Hiçbir kayıt işlenemedi. Lütfen dosya içeriğini kontrol edin.";
-                }
+                TempData["SuccessMessage"] = $"Dosya başarıyla yüklendi! Batch ID: {batchId}, Toplam Kayıt: {totalRecords}";
             }
             catch (Exception ex)
             {
-                // SQL'den gelen "Eski Dosya" hatası burada kullanıcıya gösterilecek
                 TempData["ErrorMessage"] = $"İşlem Başarısız: {ex.Message}";
             }
 
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(ImportExcel));
         }
 
         private string ReadExcelAsText(IFormFile file)
@@ -183,7 +201,7 @@ namespace DatabaseProject.Controllers
         [HttpGet]
         public IActionResult BatchDetails(int id)
         {
-            var batch = _customerDAL.GetImportHistory()
+            var batch = _customerDAL.GetImportHistoryWithFilters()
                 .FirstOrDefault(b => b.BatchID == id);
             
             if (batch == null)
@@ -250,7 +268,7 @@ namespace DatabaseProject.Controllers
             string? fileNameFilter = null, DateTime? startDate = null, DateTime? endDate = null)
         {
             int totalRecords;
-            var batches = _customerDAL.GetImportHistory(
+            var batches = _customerDAL.GetImportHistoryWithFilters(
                 statusFilter, fileNameFilter, startDate, endDate,
                 1, 10000, "UploadDate", "DESC", out totalRecords);
 
@@ -310,6 +328,107 @@ namespace DatabaseProject.Controllers
 
                 var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
                 return File(bytes, "text/csv", $"ImportHistory_{DateTime.Now:yyyyMMddHHmmss}.csv");
+            }
+        }
+
+        [HttpGet]
+        public IActionResult ExportBatchDetails(int id, string format = "excel")
+        {
+            var batch = _customerDAL.GetImportHistoryWithFilters()
+                .FirstOrDefault(b => b.BatchID == id);
+            
+            if (batch == null)
+            {
+                TempData["ErrorMessage"] = "Batch bulunamadı.";
+                return RedirectToAction(nameof(ImportExcel));
+            }
+
+            var details = _customerDAL.GetBatchDetails(id);
+
+            if (format.ToLower() == "excel")
+            {
+                using (var workbook = new XLWorkbook())
+                {
+                    var worksheet = workbook.Worksheets.Add($"Batch {id} Detayları");
+                    
+                    // Batch bilgileri
+                    worksheet.Cell(1, 1).Value = "Batch ID:";
+                    worksheet.Cell(1, 2).Value = batch.BatchID;
+                    worksheet.Cell(2, 1).Value = "Dosya Adı:";
+                    worksheet.Cell(2, 2).Value = batch.FileName;
+                    worksheet.Cell(3, 1).Value = "Dosya Tarihi:";
+                    worksheet.Cell(3, 2).Value = batch.FileTimestamp;
+                    worksheet.Cell(4, 1).Value = "Yükleme Tarihi:";
+                    worksheet.Cell(4, 2).Value = batch.UploadDate;
+                    worksheet.Cell(5, 1).Value = "Durum:";
+                    worksheet.Cell(5, 2).Value = batch.Status;
+
+                    // Detay başlıkları
+                    worksheet.Cell(7, 1).Value = "Hesap Kodu";
+                    worksheet.Cell(7, 2).Value = "Tespit Edilen İsim";
+                    worksheet.Cell(7, 3).Value = "Excel Bakiyesi";
+                    worksheet.Cell(7, 4).Value = "Sistem Bakiyesi";
+                    worksheet.Cell(7, 5).Value = "Fark";
+
+                    // Stil
+                    var headerRange = worksheet.Range(7, 1, 7, 5);
+                    headerRange.Style.Font.Bold = true;
+                    headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                    // Veriler
+                    int row = 8;
+                    foreach (var detail in details)
+                    {
+                        worksheet.Cell(row, 1).Value = detail.AccountCode;
+                        worksheet.Cell(row, 2).Value = detail.DetectedName;
+                        worksheet.Cell(row, 3).Value = detail.ExcelBalance;
+                        worksheet.Cell(row, 4).Value = detail.SystemBalanceAtTime;
+                        worksheet.Cell(row, 5).Value = detail.BalanceDifference;
+                        row++;
+                    }
+
+                    // Toplam satırı
+                    worksheet.Cell(row, 1).Value = "TOPLAM";
+                    worksheet.Cell(row, 3).Value = details.Sum(d => d.ExcelBalance);
+                    worksheet.Cell(row, 4).Value = details.Sum(d => d.SystemBalanceAtTime);
+                    worksheet.Cell(row, 5).Value = details.Sum(d => d.BalanceDifference);
+                    var totalRange = worksheet.Range(row, 1, row, 5);
+                    totalRange.Style.Font.Bold = true;
+                    totalRange.Style.Fill.BackgroundColor = XLColor.LightBlue;
+
+                    worksheet.Columns().AdjustToContents();
+
+                    using (var stream = new MemoryStream())
+                    {
+                        workbook.SaveAs(stream);
+                        var content = stream.ToArray();
+                        return File(content, 
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            $"Batch_{id}_Detaylar_{DateTime.Now:yyyyMMddHHmmss}.xlsx");
+                    }
+                }
+            }
+            else // CSV
+            {
+                var csv = new System.Text.StringBuilder();
+                csv.AppendLine($"Batch ID,{batch.BatchID}");
+                csv.AppendLine($"Dosya Adı,\"{batch.FileName}\"");
+                csv.AppendLine($"Dosya Tarihi,{batch.FileTimestamp:yyyy-MM-dd HH:mm:ss}");
+                csv.AppendLine($"Yükleme Tarihi,{batch.UploadDate:yyyy-MM-dd HH:mm:ss}");
+                csv.AppendLine($"Durum,{batch.Status}");
+                csv.AppendLine();
+                csv.AppendLine("Hesap Kodu,Tespit Edilen İsim,Excel Bakiyesi,Sistem Bakiyesi,Fark");
+                
+                foreach (var detail in details)
+                {
+                    csv.AppendLine($"{detail.AccountCode},\"{detail.DetectedName}\",{detail.ExcelBalance},{detail.SystemBalanceAtTime},{detail.BalanceDifference}");
+                }
+
+                csv.AppendLine();
+                csv.AppendLine($"TOPLAM,,{details.Sum(d => d.ExcelBalance)},{details.Sum(d => d.SystemBalanceAtTime)},{details.Sum(d => d.BalanceDifference)}");
+
+                var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
+                return File(bytes, "text/csv", $"Batch_{id}_Detaylar_{DateTime.Now:yyyyMMddHHmmss}.csv");
             }
         }
     }

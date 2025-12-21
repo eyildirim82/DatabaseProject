@@ -1,0 +1,120 @@
+@{
+    ViewData["Title"] = "Yeni Çek Ekle";
+}
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-plus-circle me-2"></i>Yeni Çek Ekle
+                    </h4>
+                </div>
+                <div class="card-body">
+                    @if (TempData["SuccessMessage"] != null)
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="bi bi-check-circle me-2"></i>@TempData["SuccessMessage"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    @if (TempData["ErrorMessage"] != null)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    <form asp-action="Create" method="post">
+                        @Html.AntiForgeryToken()
+
+                        <div class="mb-3">
+                            <label for="CustomerID" class="form-label">
+                                <i class="bi bi-person-fill me-1"></i>Müşteri <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="CustomerID" name="CustomerID" required>
+                                <option value="">-- Müşteri Seçin --</option>
+                                @if (ViewBag.Customers != null)
+                                {
+                                    @foreach (var item in (SelectList)ViewBag.Customers)
+                                    {
+                                        <option value="@item.Value">@item.Text</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="BankName" class="form-label">
+                                <i class="bi bi-bank me-1"></i>Banka Adı <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="BankName" name="BankName" required placeholder="Örn: Ziraat Bankası">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="ChequeNumber" class="form-label">
+                                <i class="bi bi-hash me-1"></i>Çek Numarası
+                            </label>
+                            <input type="text" class="form-control" id="ChequeNumber" name="ChequeNumber" placeholder="Opsiyonel">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="Amount" class="form-label">
+                                <i class="bi bi-currency-exchange me-1"></i>Tutar <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="Amount" name="Amount" 
+                                       step="0.01" min="0.01" required placeholder="0.00">
+                                <span class="input-group-text">₺</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="DueDate" class="form-label">
+                                <i class="bi bi-calendar-event me-1"></i>Vade Tarihi <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" class="form-control" id="DueDate" name="DueDate" 
+                                   min="@DateTime.Today.ToString("yyyy-MM-dd")" required>
+                        </div>
+
+                        <hr class="my-4" />
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Geri Dön
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save me-1"></i>Kaydet
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-4 border-info">
+                <div class="card-header bg-light">
+                    <i class="bi bi-info-circle me-2"></i>Bilgi
+                </div>
+                <div class="card-body small">
+                    <ul class="mb-0">
+                        <li>Risk limiti kontrolü otomatik yapılır. Limit aşılırsa çek eklenemez.</li>
+                        <li>Çek eklendiğinde durum otomatik olarak "Portfolio" olarak ayarlanır.</li>
+                        <li>Vade tarihi bugünden önce olamaz.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-label {
+        font-weight: 600;
+    }
+    .text-danger {
+        color: #dc3545 !important;
+    }
+</style>

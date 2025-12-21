@@ -1,0 +1,141 @@
+@model DatabaseProject.Models.Cheque
+@{
+    ViewData["Title"] = "Çek Durumu Güncelle";
+}
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="bi bi-pencil-square me-2"></i>Çek Durumu Güncelle
+                    </h4>
+                </div>
+                <div class="card-body">
+                    @if (TempData["SuccessMessage"] != null)
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="bi bi-check-circle me-2"></i>@TempData["SuccessMessage"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    @if (TempData["ErrorMessage"] != null)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    <!-- Çek Bilgileri (Sadece Görüntüleme) -->
+                    <div class="card mb-4 border-secondary">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Çek Bilgileri</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <strong>Çek ID:</strong> @Model.ChequeID
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Müşteri:</strong> @Model.CompanyName
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Banka:</strong> @Model.BankName
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Çek No:</strong> @(Model.ChequeNumber ?? "-")
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Tutar:</strong> @Model.Amount.ToString("N2") ₺
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Vade Tarihi:</strong> @Model.DueDate.ToString("dd.MM.yyyy")
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Mevcut Durum:</strong> 
+                                    @if (Model.Status == "Portfolio")
+                                    {
+                                        <span class="badge bg-info">@Model.Status</span>
+                                    }
+                                    else if (Model.Status == "Collected")
+                                    {
+                                        <span class="badge bg-success">@Model.Status</span>
+                                    }
+                                    else if (Model.Status == "Bounced")
+                                    {
+                                        <span class="badge bg-danger">@Model.Status</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning">@Model.Status</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Durum Güncelleme Formu -->
+                    <form asp-action="Edit" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="ChequeID" value="@Model.ChequeID" />
+
+                        <div class="mb-4">
+                            <label for="Status" class="form-label">
+                                <i class="bi bi-arrow-repeat me-1"></i>Yeni Durum <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="Status" name="Status" required>
+                                @if (ViewBag.AvailableStatuses != null)
+                                {
+                                    @foreach (var item in (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.AvailableStatuses)
+                                    {
+                                        <option value="@item.Value" selected="@(item.Value == Model.Status)">@item.Text</option>
+                                    }
+                                }
+                            </select>
+                            <div class="form-text">
+                                <strong>Not:</strong> Durum "Collected" olarak değiştirildiğinde müşteri bakiyesi otomatik güncellenir.
+                            </div>
+                        </div>
+
+                        <hr class="my-4" />
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Geri Dön
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-save me-1"></i>Durumu Güncelle
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-4 border-info">
+                <div class="card-header bg-light">
+                    <i class="bi bi-info-circle me-2"></i>Durum Açıklamaları
+                </div>
+                <div class="card-body small">
+                    <ul class="mb-0">
+                        <li><strong>Portfolio:</strong> Çek portföyde, henüz tahsil edilmedi</li>
+                        <li><strong>Collected:</strong> Çek tahsil edildi, müşteri bakiyesi güncellendi</li>
+                        <li><strong>Bounced:</strong> Çek karşılıksız çıktı, risk uyarısı verilir</li>
+                        <li><strong>Returned:</strong> Çek iade edildi</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-label {
+        font-weight: 600;
+    }
+    .text-danger {
+        color: #dc3545 !important;
+    }
+</style>

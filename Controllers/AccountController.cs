@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using CSE3055Project.DAL;
-using CSE3055Project.Models;
+using Microsoft.AspNetCore.Mvc;
+using DatabaseProject.DAL;
+using DatabaseProject.Models;
 
-namespace CSE3055Project.Controllers
+namespace DatabaseProject.Controllers
 {
     public class AccountController : Controller
     {
