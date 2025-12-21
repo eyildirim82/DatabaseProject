@@ -51,6 +51,218 @@ namespace DatabaseProject.DAL
             return customers;
         }
 
+        public List<ImportBatch> GetImportHistory()
+        {
+            return GetImportHistory(null, null, null, null, 1, 10, "UploadDate", "DESC", out _);
+        }
+
+        public List<ImportBatch> GetImportHistory(string? statusFilter, string? fileNameFilter, 
+            DateTime? startDate, DateTime? endDate, int pageNumber, int pageSize, 
+            string sortBy, string sortDirection, out int totalRecords)
+        {
+            var batches = new List<ImportBatch>();
+            totalRecords = 0;
+
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+
+                // Önce toplam kayıt sayısını al
+                string countQuery = @"SELECT COUNT(*) FROM ImportBatches 
+                                     WHERE (@Status IS NULL OR Status = @Status)
+                                       AND (@FileName IS NULL OR FileName LIKE '%' + @FileName + '%')
+                                       AND (@StartDate IS NULL OR UploadDate >= @StartDate)
+                                       AND (@EndDate IS NULL OR UploadDate <= @EndDate)";
+
+                using (SqlCommand countCmd = new SqlCommand(countQuery, conn))
+                {
+                    countCmd.Parameters.AddWithValue("@Status", (object?)statusFilter ?? DBNull.Value);
+                    countCmd.Parameters.AddWithValue("@FileName", (object?)fileNameFilter ?? DBNull.Value);
+                    countCmd.Parameters.AddWithValue("@StartDate", (object?)startDate ?? DBNull.Value);
+                    countCmd.Parameters.AddWithValue("@EndDate", (object?)endDate ?? DBNull.Value);
+                    totalRecords = (int)countCmd.ExecuteScalar();
+                }
+
+                // Sonra sayfalanmış ve sıralanmış verileri al
+                int offset = (pageNumber - 1) * pageSize;
+                string sortColumn = sortBy switch
+                {
+                    "FileName" => "FileName",
+                    "FileTimestamp" => "FileTimestamp",
+                    "TotalRecords" => "TotalRecords",
+                    "Status" => "Status",
+                    _ => "UploadDate"
+                };
+
+                string query = $@"SELECT BatchID, FileName, FileTimestamp, UploadDate, TotalRecords, Status 
+                                 FROM ImportBatches 
+                                 WHERE (@Status IS NULL OR Status = @Status)
+                                   AND (@FileName IS NULL OR FileName LIKE '%' + @FileName + '%')
+                                   AND (@StartDate IS NULL OR UploadDate >= @StartDate)
+                                   AND (@EndDate IS NULL OR UploadDate <= @EndDate)
+                                 ORDER BY {sortColumn} {(sortDirection == "ASC" ? "ASC" : "DESC")}
+                                 OFFSET @Offset ROWS
+                                 FETCH NEXT @PageSize ROWS ONLY";
+
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Status", (object?)statusFilter ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@FileName", (object?)fileNameFilter ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@StartDate", (object?)startDate ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@EndDate", (object?)endDate ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Offset", offset);
+                    cmd.Parameters.AddWithValue("@PageSize", pageSize);
+
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            batches.Add(new ImportBatch
+                            {
+                                BatchID = reader.GetInt32(reader.GetOrdinal("BatchID")),
+                                FileName = reader.GetString(reader.GetOrdinal("FileName")),
+                                FileTimestamp = reader.GetDateTime(reader.GetOrdinal("FileTimestamp")),
+                                UploadDate = reader.GetDateTime(reader.GetOrdinal("UploadDate")),
+                                TotalRecords = reader.GetInt32(reader.GetOrdinal("TotalRecords")),
+                                Status = reader.GetString(reader.GetOrdinal("Status"))
+                            });
+                        }
+                    }
+                }
+            }
+
+            return batches;
+        }
+
+        public List<ImportDetail> GetBatchDetails(int batchId)
+        {
+            var details = new List<ImportDetail>();
+
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                string query = @"SELECT DetailID, BatchID, AccountCode, DetectedName, ExcelBalance, SystemBalanceAtTime
+                                FROM ImportDetails
+                                WHERE BatchID = @BatchID
+                                ORDER BY AccountCode";
+
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@BatchID", batchId);
+                    conn.Open();
+
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            details.Add(new ImportDetail
+                            {
+                                DetailID = reader.GetInt32(reader.GetOrdinal("DetailID")),
+                                BatchID = reader.GetInt32(reader.GetOrdinal("BatchID")),
+                                AccountCode = reader.IsDBNull(reader.GetOrdinal("AccountCode")) ? string.Empty : reader.GetString(reader.GetOrdinal("AccountCode")),
+                                DetectedName = reader.IsDBNull(reader.GetOrdinal("DetectedName")) ? string.Empty : reader.GetString(reader.GetOrdinal("DetectedName")),
+                                ExcelBalance = reader.GetDecimal(reader.GetOrdinal("ExcelBalance")),
+                                SystemBalanceAtTime = reader.IsDBNull(reader.GetOrdinal("SystemBalanceAtTime")) ? 0 : reader.GetDecimal(reader.GetOrdinal("SystemBalanceAtTime"))
+                            });
+                        }
+                    }
+                }
+            }
+
+            return details;
+        }
+
+        public BatchStatistics GetBatchStatistics()
+        {
+            var statistics = new BatchStatistics();
+
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+
+                // Toplam batch sayısı ve status'lere göre sayılar
+                string query = @"SELECT 
+                                    COUNT(*) as TotalBatches,
+                                    SUM(CASE WHEN Status = 'Processed' THEN 1 ELSE 0 END) as ProcessedCount,
+                                    SUM(CASE WHEN Status = 'Pending' THEN 1 ELSE 0 END) as PendingCount,
+                                    SUM(CASE WHEN Status = 'Rejected' THEN 1 ELSE 0 END) as RejectedCount,
+                                    SUM(TotalRecords) as TotalRecords,
+                                    MAX(UploadDate) as LastUploadDate
+                                 FROM ImportBatches";
+
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            statistics.TotalBatches = reader.GetInt32(reader.GetOrdinal("TotalBatches"));
+                            statistics.ProcessedCount = reader.IsDBNull(reader.GetOrdinal("ProcessedCount")) ? 0 : reader.GetInt32(reader.GetOrdinal("ProcessedCount"));
+                            statistics.PendingCount = reader.IsDBNull(reader.GetOrdinal("PendingCount")) ? 0 : reader.GetInt32(reader.GetOrdinal("PendingCount"));
+                            statistics.RejectedCount = reader.IsDBNull(reader.GetOrdinal("RejectedCount")) ? 0 : reader.GetInt32(reader.GetOrdinal("RejectedCount"));
+                            statistics.TotalRecords = reader.IsDBNull(reader.GetOrdinal("TotalRecords")) ? 0 : reader.GetInt32(reader.GetOrdinal("TotalRecords"));
+                            statistics.LastUploadDate = reader.IsDBNull(reader.GetOrdinal("LastUploadDate")) ? null : reader.GetDateTime(reader.GetOrdinal("LastUploadDate"));
+                        }
+                    }
+                }
+            }
+
+            return statistics;
+        }
+
+        public bool UpdateBatchStatus(int batchId, string newStatus)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                string query = "UPDATE ImportBatches SET Status = @Status WHERE BatchID = @BatchID";
+
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Status", newStatus);
+                    cmd.Parameters.AddWithValue("@BatchID", batchId);
+                    conn.Open();
+
+                    int rowsAffected = cmd.ExecuteNonQuery();
+                    return rowsAffected > 0;
+                }
+            }
+        }
+
+        public bool DeleteBatch(int batchId)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                SqlTransaction transaction = conn.BeginTransaction();
+
+                try
+                {
+                    // Önce ImportDetails kayıtlarını sil
+                    string deleteDetailsQuery = "DELETE FROM ImportDetails WHERE BatchID = @BatchID";
+                    using (SqlCommand detailCmd = new SqlCommand(deleteDetailsQuery, conn, transaction))
+                    {
+                        detailCmd.Parameters.AddWithValue("@BatchID", batchId);
+                        detailCmd.ExecuteNonQuery();
+                    }
+
+                    // Sonra ImportBatch kaydını sil
+                    string deleteBatchQuery = "DELETE FROM ImportBatches WHERE BatchID = @BatchID";
+                    using (SqlCommand batchCmd = new SqlCommand(deleteBatchQuery, conn, transaction))
+                    {
+                        batchCmd.Parameters.AddWithValue("@BatchID", batchId);
+                        int rowsAffected = batchCmd.ExecuteNonQuery();
+                        
+                        transaction.Commit();
+                        return rowsAffected > 0;
+                    }
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    return false;
+                }
+            }
+        }
+
         public (int SuccessCount, int ErrorCount, string Message) ParseAndImportReport(string fileContent, string fileName, DateTime fileTimestamp, int userId)
         {
             int successCount = 0;

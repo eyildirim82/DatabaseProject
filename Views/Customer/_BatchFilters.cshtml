@@ -1,0 +1,65 @@
+@model DatabaseProject.Models.ImportBatchViewModel
+
+<form method="get" asp-action="ImportExcel" class="card mb-4">
+    <div class="card-header bg-light">
+        <h6 class="mb-0"><i class="bi bi-funnel me-2"></i>Filtreleme</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Durum</label>
+                <select name="statusFilter" class="form-select">
+                    <option value="">Tümü</option>
+                    @if (Model.StatusFilter == "Processed")
+                    {
+                        <option value="Processed" selected>İşlenmiş</option>
+                    }
+                    else
+                    {
+                        <option value="Processed">İşlenmiş</option>
+                    }
+                    @if (Model.StatusFilter == "Pending")
+                    {
+                        <option value="Pending" selected>Beklemede</option>
+                    }
+                    else
+                    {
+                        <option value="Pending">Beklemede</option>
+                    }
+                    @if (Model.StatusFilter == "Rejected")
+                    {
+                        <option value="Rejected" selected>Reddedilmiş</option>
+                    }
+                    else
+                    {
+                        <option value="Rejected">Reddedilmiş</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Dosya Adı</label>
+                <input type="text" name="fileNameFilter" class="form-control" value="@Model.FileNameFilter" placeholder="Ara...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Başlangıç Tarihi</label>
+                <input type="date" name="startDate" class="form-control" value="@(Model.StartDate?.ToString("yyyy-MM-dd"))">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Bitiş Tarihi</label>
+                <input type="date" name="endDate" class="form-control" value="@(Model.EndDate?.ToString("yyyy-MM-dd"))">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100 me-2">
+                    <i class="bi bi-search me-1"></i>Filtrele
+                </button>
+                <a asp-action="ImportExcel" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </div>
+        <input type="hidden" name="page" value="1">
+        <input type="hidden" name="pageSize" value="@Model.PageSize">
+        <input type="hidden" name="sortBy" value="@Model.SortBy">
+        <input type="hidden" name="sortDirection" value="@Model.SortDirection">
+    </div>
+</form>

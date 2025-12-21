@@ -1,0 +1,139 @@
+@{
+    ViewData["Title"] = "Yeni İşlem Ekle";
+}
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-plus-circle me-2"></i>Yeni İşlem Ekle
+                    </h4>
+                </div>
+                <div class="card-body">
+                    @if (TempData["SuccessMessage"] != null)
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="bi bi-check-circle me-2"></i>@TempData["SuccessMessage"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    @if (TempData["ErrorMessage"] != null)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    <form asp-action="Create" method="post">
+                        @Html.AntiForgeryToken()
+
+                        <div class="mb-3">
+                            <label for="CustomerID" class="form-label">
+                                <i class="bi bi-person-fill me-1"></i>Müşteri <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="CustomerID" name="CustomerID" required>
+                                <option value="">-- Müşteri Seçin --</option>
+                                @if (ViewBag.Customers != null)
+                                {
+                                    @foreach (var item in (SelectList)ViewBag.Customers)
+                                    {
+                                        <option value="@item.Value">@item.Text</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="MethodID" class="form-label">
+                                <i class="bi bi-credit-card me-1"></i>Ödeme Yöntemi <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="MethodID" name="MethodID" required>
+                                <option value="">-- Ödeme Yöntemi Seçin --</option>
+                                @if (ViewBag.PaymentMethods != null)
+                                {
+                                    @foreach (var item in (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.PaymentMethods)
+                                    {
+                                        <option value="@item.Value">@item.Text</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="AccountID" class="form-label">
+                                <i class="bi bi-bank me-1"></i>Şirket Hesabı <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="AccountID" name="AccountID" required>
+                                <option value="">-- Şirket Hesabı Seçin --</option>
+                                @if (ViewBag.CompanyAccounts != null)
+                                {
+                                    @foreach (var item in (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.CompanyAccounts)
+                                    {
+                                        <option value="@item.Value">@item.Text</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="Amount" class="form-label">
+                                <i class="bi bi-currency-exchange me-1"></i>Tutar <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="Amount" name="Amount" 
+                                       step="0.01" required placeholder="0.00">
+                                <span class="input-group-text">₺</span>
+                            </div>
+                            <div class="form-text">Pozitif değer: Müşteriden alınan ödeme (Alacak azalır), Negatif değer: Müşteriye yapılan ödeme (Borç artar)</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="Description" class="form-label">
+                                <i class="bi bi-file-text me-1"></i>Açıklama
+                            </label>
+                            <textarea class="form-control" id="Description" name="Description" 
+                                      rows="3" placeholder="İşlem açıklaması (opsiyonel)"></textarea>
+                        </div>
+
+                        <hr class="my-4" />
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" asp-controller="Customer" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Geri Dön
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save me-1"></i>Kaydet
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-4 border-info">
+                <div class="card-header bg-light">
+                    <i class="bi bi-info-circle me-2"></i>Bilgi
+                </div>
+                <div class="card-body small">
+                    <ul class="mb-0">
+                        <li><strong>Pozitif Tutar:</strong> Müşteriden alınan ödeme (Alacak azalır)</li>
+                        <li><strong>Negatif Tutar:</strong> Müşteriye yapılan ödeme (Borç artar)</li>
+                        <li>Risk limiti kontrolü otomatik yapılır. Limit aşılırsa işlem reddedilir.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-label {
+        font-weight: 600;
+    }
+    .text-danger {
+        color: #dc3545 !important;
+    }
+</style>

@@ -1,0 +1,68 @@
+@model DatabaseProject.Models.BatchStatistics
+
+@if (Model != null)
+{
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title mb-0">Toplam Batch</h6>
+                            <h3 class="mb-0">@Model.TotalBatches</h3>
+                        </div>
+                        <i class="bi bi-files display-4 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title mb-0">İşlenmiş</h6>
+                            <h3 class="mb-0">@Model.ProcessedCount</h3>
+                        </div>
+                        <i class="bi bi-check-circle display-4 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title mb-0">Beklemede</h6>
+                            <h3 class="mb-0">@Model.PendingCount</h3>
+                        </div>
+                        <i class="bi bi-hourglass-split display-4 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title mb-0">Reddedilmiş</h6>
+                            <h3 class="mb-0">@Model.RejectedCount</h3>
+                        </div>
+                        <i class="bi bi-x-circle display-4 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    @if (Model.LastUploadDate.HasValue)
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-calendar-event me-2"></i>
+            <strong>Son Yükleme:</strong> @Model.LastUploadDate.Value.ToString("dd.MM.yyyy HH:mm")
+            <span class="ms-3"><strong>Toplam Kayıt:</strong> @Model.TotalRecords</span>
+        </div>
+    }
+}

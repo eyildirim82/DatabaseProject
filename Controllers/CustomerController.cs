@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using DatabaseProject.DAL;
 using DatabaseProject.Models;
 using ClosedXML.Excel;
+using System.Linq;
 
 namespace DatabaseProject.Controllers
 {
@@ -21,9 +22,31 @@ namespace DatabaseProject.Controllers
         }
 
         [HttpGet]
-        public IActionResult ImportExcel()
+        public IActionResult ImportExcel(string? statusFilter, string? fileNameFilter, 
+            DateTime? startDate, DateTime? endDate, int page = 1, int pageSize = 10, 
+            string sortBy = "UploadDate", string sortDirection = "DESC")
         {
-            return View();
+            var viewModel = new ImportBatchViewModel
+            {
+                StatusFilter = statusFilter,
+                FileNameFilter = fileNameFilter,
+                StartDate = startDate,
+                EndDate = endDate,
+                PageNumber = page,
+                PageSize = pageSize,
+                SortBy = sortBy,
+                SortDirection = sortDirection
+            };
+
+            int totalRecords;
+            viewModel.Batches = _customerDAL.GetImportHistory(
+                statusFilter, fileNameFilter, startDate, endDate,
+                page, pageSize, sortBy, sortDirection, out totalRecords);
+            
+            viewModel.TotalRecords = totalRecords;
+            viewModel.Statistics = _customerDAL.GetBatchStatistics();
+
+            return View(viewModel);
         }
 
         [HttpPost]
@@ -155,6 +178,139 @@ namespace DatabaseProject.Controllers
             }
 
             return sb.ToString();
+        }
+
+        [HttpGet]
+        public IActionResult BatchDetails(int id)
+        {
+            var batch = _customerDAL.GetImportHistory()
+                .FirstOrDefault(b => b.BatchID == id);
+            
+            if (batch == null)
+            {
+                TempData["ErrorMessage"] = "Batch bulunamadı.";
+                return RedirectToAction(nameof(ImportExcel));
+            }
+
+            var details = _customerDAL.GetBatchDetails(id);
+            ViewBag.Batch = batch;
+            return View(details);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult UpdateBatchStatus(int batchId, string status)
+        {
+            try
+            {
+                bool success = _customerDAL.UpdateBatchStatus(batchId, status);
+                if (success)
+                {
+                    TempData["SuccessMessage"] = "Batch durumu başarıyla güncellendi.";
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = "Batch durumu güncellenemedi.";
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Hata: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(ImportExcel));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult DeleteBatch(int batchId)
+        {
+            try
+            {
+                bool success = _customerDAL.DeleteBatch(batchId);
+                if (success)
+                {
+                    TempData["SuccessMessage"] = "Batch başarıyla silindi.";
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = "Batch silinemedi.";
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Hata: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(ImportExcel));
+        }
+
+        [HttpGet]
+        public IActionResult ExportHistory(string format = "csv", string? statusFilter = null, 
+            string? fileNameFilter = null, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            int totalRecords;
+            var batches = _customerDAL.GetImportHistory(
+                statusFilter, fileNameFilter, startDate, endDate,
+                1, 10000, "UploadDate", "DESC", out totalRecords);
+
+            if (format.ToLower() == "excel")
+            {
+                using (var workbook = new XLWorkbook())
+                {
+                    var worksheet = workbook.Worksheets.Add("Import History");
+                    
+                    // Başlıklar
+                    worksheet.Cell(1, 1).Value = "Batch ID";
+                    worksheet.Cell(1, 2).Value = "Dosya Adı";
+                    worksheet.Cell(1, 3).Value = "Dosya Tarihi";
+                    worksheet.Cell(1, 4).Value = "Yükleme Tarihi";
+                    worksheet.Cell(1, 5).Value = "Kayıt Sayısı";
+                    worksheet.Cell(1, 6).Value = "Durum";
+
+                    // Stil
+                    var headerRange = worksheet.Range(1, 1, 1, 6);
+                    headerRange.Style.Font.Bold = true;
+                    headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                    // Veriler
+                    int row = 2;
+                    foreach (var batch in batches)
+                    {
+                        worksheet.Cell(row, 1).Value = batch.BatchID;
+                        worksheet.Cell(row, 2).Value = batch.FileName;
+                        worksheet.Cell(row, 3).Value = batch.FileTimestamp;
+                        worksheet.Cell(row, 4).Value = batch.UploadDate;
+                        worksheet.Cell(row, 5).Value = batch.TotalRecords;
+                        worksheet.Cell(row, 6).Value = batch.Status;
+                        row++;
+                    }
+
+                    worksheet.Columns().AdjustToContents();
+
+                    using (var stream = new MemoryStream())
+                    {
+                        workbook.SaveAs(stream);
+                        var content = stream.ToArray();
+                        return File(content, 
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            $"ImportHistory_{DateTime.Now:yyyyMMddHHmmss}.xlsx");
+                    }
+                }
+            }
+            else // CSV
+            {
+                var csv = new System.Text.StringBuilder();
+                csv.AppendLine("Batch ID,Dosya Adı,Dosya Tarihi,Yükleme Tarihi,Kayıt Sayısı,Durum");
+                
+                foreach (var batch in batches)
+                {
+                    csv.AppendLine($"{batch.BatchID},\"{batch.FileName}\",{batch.FileTimestamp:yyyy-MM-dd HH:mm:ss},{batch.UploadDate:yyyy-MM-dd HH:mm:ss},{batch.TotalRecords},{batch.Status}");
+                }
+
+                var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
+                return File(bytes, "text/csv", $"ImportHistory_{DateTime.Now:yyyyMMddHHmmss}.csv");
+            }
         }
     }
 }
