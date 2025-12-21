@@ -2,9 +2,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using DatabaseProject.DAL;
 using DatabaseProject.Models;
+using DatabaseProject.Filters;
 
 namespace DatabaseProject.Controllers
 {
+    [SessionCheck]
+    [RoleCheck(1, 2)] // Admin ve Accountant
     public class ChequeController : Controller
     {
         private readonly ChequeDAL _chequeDAL;
@@ -151,6 +154,88 @@ namespace DatabaseProject.Controllers
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = $"Çek silinirken hata oluştu: {ex.Message}";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        // POST: Cheque/CollectCheque/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult CollectCheque(int id)
+        {
+            try
+            {
+                var cheque = _chequeDAL.GetChequeById(id);
+                
+                if (cheque == null)
+                {
+                    TempData["ErrorMessage"] = "Çek bulunamadı.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                if (cheque.Status != "Portfolio")
+                {
+                    TempData["ErrorMessage"] = "Sadece Portfolio durumundaki çekler tahsil edilebilir.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // UserID'yi Session'dan al
+                int? sessionUserId = HttpContext.Session.GetInt32("UserID");
+                if (sessionUserId == null)
+                {
+                    TempData["ErrorMessage"] = "Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                _chequeDAL.CollectCheque(id, sessionUserId.Value);
+                
+                TempData["SuccessMessage"] = "Çek başarıyla tahsil edildi ve bakiye güncellendi.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Çek tahsil edilirken hata oluştu: {ex.Message}";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        // POST: Cheque/MarkBounced/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult MarkBounced(int id)
+        {
+            try
+            {
+                var cheque = _chequeDAL.GetChequeById(id);
+                
+                if (cheque == null)
+                {
+                    TempData["ErrorMessage"] = "Çek bulunamadı.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                if (cheque.Status != "Portfolio")
+                {
+                    TempData["ErrorMessage"] = "Sadece Portfolio durumundaki çekler karşılıksız olarak işaretlenebilir.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // UserID'yi Session'dan al
+                int? sessionUserId = HttpContext.Session.GetInt32("UserID");
+                if (sessionUserId == null)
+                {
+                    TempData["ErrorMessage"] = "Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                _chequeDAL.MarkBounced(id, sessionUserId.Value);
+                
+                TempData["SuccessMessage"] = "Çek karşılıksız olarak işaretlendi.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Çek karşılıksız olarak işaretlenirken hata oluştu: {ex.Message}";
                 return RedirectToAction(nameof(Index));
             }
         }

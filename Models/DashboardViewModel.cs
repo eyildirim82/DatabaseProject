@@ -13,6 +13,8 @@ namespace DatabaseProject.Models
         public int TotalCustomers { get; set; }
         public decimal TodayCollection { get; set; }
         public int PendingCheques { get; set; }
+        public decimal TotalReceivables { get; set; }
+        public int RiskyCustomerCount { get; set; }
     }
 
     public class RiskStatusItem

@@ -1,10 +1,12 @@
 using System.Diagnostics;
 using DatabaseProject.Models;
 using DatabaseProject.DAL;
+using DatabaseProject.Filters;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DatabaseProject.Controllers
 {
+    [SessionCheck]
     public class HomeController : Controller
     {
         private readonly DashboardDAL _dashboardDAL;

@@ -115,6 +115,21 @@
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
+                                            @if (cheque.Status == "Portfolio")
+                                            {
+                                                <form asp-action="CollectCheque" asp-route-id="@cheque.ChequeID" method="post" class="d-inline" onsubmit="return confirm('Bu çeki tahsil etmek istediğinize emin misiniz?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-success">
+                                                        <i class="bi bi-check-circle"></i> Tahsil Et
+                                                    </button>
+                                                </form>
+                                                <form asp-action="MarkBounced" asp-route-id="@cheque.ChequeID" method="post" class="d-inline" onsubmit="return confirm('Bu çeki karşılıksız olarak işaretlemek istediğinize emin misiniz?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-danger">
+                                                        <i class="bi bi-x-circle"></i> Karşılıksız
+                                                    </button>
+                                                </form>
+                                            }
                                             <a asp-action="Edit" asp-route-id="@cheque.ChequeID" class="btn btn-sm btn-outline-primary">
                                                 <i class="bi bi-pencil"></i> Düzenle
                                             </a>

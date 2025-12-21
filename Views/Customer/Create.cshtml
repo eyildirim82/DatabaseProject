@@ -1,0 +1,106 @@
+@{
+    ViewData["Title"] = "Yeni Müşteri Ekle";
+}
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-plus-circle me-2"></i>Yeni Müşteri Ekle
+                    </h4>
+                </div>
+                <div class="card-body">
+                    @if (TempData["ErrorMessage"] != null)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    <form asp-action="Create" method="post">
+                        @Html.AntiForgeryToken()
+
+                        <div class="mb-3">
+                            <label for="AccountCode" class="form-label">
+                                <i class="bi bi-key me-1"></i>Hesap Kodu <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="AccountCode" name="AccountCode" required maxlength="20">
+                            <div class="form-text">Benzersiz hesap kodu (örn: CARI001)</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="CompanyName" class="form-label">
+                                <i class="bi bi-building me-1"></i>Firma Adı <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="CompanyName" name="CompanyName" required maxlength="200">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="TaxID" class="form-label">
+                                    <i class="bi bi-file-text me-1"></i>Vergi No
+                                </label>
+                                <input type="text" class="form-control" id="TaxID" name="TaxID" maxlength="20">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="TaxOffice" class="form-label">
+                                    <i class="bi bi-building me-1"></i>Vergi Dairesi
+                                </label>
+                                <input type="text" class="form-control" id="TaxOffice" name="TaxOffice" maxlength="100">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="Address" class="form-label">
+                                <i class="bi bi-geo-alt me-1"></i>Adres
+                            </label>
+                            <textarea class="form-control" id="Address" name="Address" rows="3" maxlength="500"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="PhoneNumber" class="form-label">
+                                <i class="bi bi-telephone me-1"></i>Telefon
+                            </label>
+                            <input type="text" class="form-control" id="PhoneNumber" name="PhoneNumber" maxlength="20">
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="RiskLimit" class="form-label">
+                                <i class="bi bi-shield-exclamation me-1"></i>Risk Limiti <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="RiskLimit" name="RiskLimit" 
+                                       step="0.01" required min="0.01" placeholder="0.00">
+                                <span class="input-group-text">₺</span>
+                            </div>
+                            <div class="form-text">Müşterinin maksimum kredi limiti</div>
+                        </div>
+
+                        <hr class="my-4" />
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Geri Dön
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save me-1"></i>Kaydet
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-label {
+        font-weight: 600;
+    }
+    .text-danger {
+        color: #dc3545 !important;
+    }
+</style>

@@ -1,0 +1,78 @@
+@model DatabaseProject.Models.CollectionNote
+@{
+    ViewData["Title"] = "Not Düzenle";
+}
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-pencil me-2"></i>Not Düzenle
+                        <span class="ms-2">- @Model.CompanyName</span>
+                    </h4>
+                </div>
+                <div class="card-body">
+                    @if (TempData["ErrorMessage"] != null)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="bi bi-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    <form asp-action="Edit" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="noteId" value="@Model.NoteID" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Müşteri</label>
+                            <input type="text" class="form-control" value="@Model.CompanyName" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Oluşturulma Tarihi</label>
+                            <input type="text" class="form-control" value="@Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="noteText" class="form-label">
+                                <i class="bi bi-file-text me-1"></i>Not Metni <span class="text-danger">*</span>
+                            </label>
+                            <textarea class="form-control" id="noteText" name="noteText" rows="5" required>@Model.NoteText</textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="promiseDate" class="form-label">
+                                <i class="bi bi-calendar me-1"></i>Vaade Tarihi (Opsiyonel)
+                            </label>
+                            <input type="date" class="form-control" id="promiseDate" name="promiseDate" value="@(Model.PromiseDate?.ToString("yyyy-MM-dd") ?? "")">
+                            <div class="form-text">Müşterinin ödeme vaat ettiği tarih (varsa)</div>
+                        </div>
+
+                        <hr class="my-4" />
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" asp-route-customerId="@Model.CustomerID" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Geri Dön
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save me-1"></i>Güncelle
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-label {
+        font-weight: 600;
+    }
+    .text-danger {
+        color: #dc3545 !important;
+    }
+</style>

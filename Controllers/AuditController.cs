@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using DatabaseProject.DAL;
 using DatabaseProject.Models;
+using DatabaseProject.Filters;
 
 namespace DatabaseProject.Controllers
 {
+    [SessionCheck]
+    [RoleCheck(1)] // Sadece Admin
     public class AuditController : Controller
     {
         private readonly AuditDAL _auditDAL;

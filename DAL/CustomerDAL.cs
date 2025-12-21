@@ -52,6 +52,137 @@ namespace DatabaseProject.DAL
         }
 
         /// <summary>
+        /// Customer ID'ye göre müşteri bilgilerini getirir
+        /// </summary>
+        public Customer? GetCustomerById(int customerId)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                string query = @"SELECT CustomerID, AccountCode, CompanyName, TaxID, TaxOffice, 
+                                Address, PhoneNumber, RiskLimit, CurrentBalance, AvailableRisk 
+                                FROM Customers 
+                                WHERE CustomerID = @CustomerID";
+                
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@CustomerID", customerId);
+                    conn.Open();
+                    
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new Customer
+                            {
+                                CustomerID = reader.GetInt32(reader.GetOrdinal("CustomerID")),
+                                AccountCode = reader.GetString(reader.GetOrdinal("AccountCode")),
+                                CompanyName = reader.GetString(reader.GetOrdinal("CompanyName")),
+                                TaxID = reader.IsDBNull(reader.GetOrdinal("TaxID")) ? null : reader.GetString(reader.GetOrdinal("TaxID")),
+                                TaxOffice = reader.IsDBNull(reader.GetOrdinal("TaxOffice")) ? null : reader.GetString(reader.GetOrdinal("TaxOffice")),
+                                Address = reader.IsDBNull(reader.GetOrdinal("Address")) ? null : reader.GetString(reader.GetOrdinal("Address")),
+                                PhoneNumber = reader.IsDBNull(reader.GetOrdinal("PhoneNumber")) ? null : reader.GetString(reader.GetOrdinal("PhoneNumber")),
+                                RiskLimit = reader.GetDecimal(reader.GetOrdinal("RiskLimit")),
+                                CurrentBalance = reader.GetDecimal(reader.GetOrdinal("CurrentBalance"))
+                            };
+                        }
+                    }
+                }
+            }
+            
+            return null;
+        }
+
+        /// <summary>
+        /// Yeni müşteri ekler (sp_AddCustomer stored procedure ile)
+        /// </summary>
+        public void AddCustomer(Customer customer)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                using (SqlCommand cmd = new SqlCommand("sp_AddCustomer", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@AccountCode", customer.AccountCode);
+                    cmd.Parameters.AddWithValue("@CompanyName", customer.CompanyName);
+                    cmd.Parameters.AddWithValue("@TaxID", (object?)customer.TaxID ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@TaxOffice", (object?)customer.TaxOffice ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Address", (object?)customer.Address ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@PhoneNumber", (object?)customer.PhoneNumber ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@RiskLimit", customer.RiskLimit);
+
+                    conn.Open();
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                    catch (SqlException ex)
+                    {
+                        throw new Exception($"Müşteri eklenirken hata oluştu: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Müşteri bilgilerini günceller (sp_UpdateCustomer stored procedure ile)
+        /// </summary>
+        public void UpdateCustomer(Customer customer)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                using (SqlCommand cmd = new SqlCommand("sp_UpdateCustomer", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@CustomerID", customer.CustomerID);
+                    cmd.Parameters.AddWithValue("@CompanyName", customer.CompanyName);
+                    cmd.Parameters.AddWithValue("@TaxID", (object?)customer.TaxID ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@TaxOffice", (object?)customer.TaxOffice ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Address", (object?)customer.Address ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@PhoneNumber", (object?)customer.PhoneNumber ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@RiskLimit", customer.RiskLimit);
+
+                    conn.Open();
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                    catch (SqlException ex)
+                    {
+                        throw new Exception($"Müşteri güncellenirken hata oluştu: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Müşteri siler (sp_DeleteCustomer stored procedure ile)
+        /// </summary>
+        public void DeleteCustomer(int customerId)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                using (SqlCommand cmd = new SqlCommand("sp_DeleteCustomer", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@CustomerID", customerId);
+
+                    conn.Open();
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                    catch (SqlException ex)
+                    {
+                        throw new Exception($"Müşteri silinirken hata oluştu: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Geçmiş yüklemeleri getirir (en son 20 kayıt) - Async versiyon
         /// </summary>
         public async Task<List<ImportBatch>> GetImportHistoryAsync()
@@ -253,7 +384,7 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT DetailID, BatchID, AccountCode, DetectedName, ExcelBalance, SystemBalanceAtTime
+                string query = @"SELECT DetailID, BatchID, AccountCode, DetectedName, ExcelBalance, SystemBalanceAtTime, ErrorMessage
                                 FROM ImportDetails
                                 WHERE BatchID = @BatchID
                                 ORDER BY AccountCode";
@@ -274,7 +405,8 @@ namespace DatabaseProject.DAL
                                 AccountCode = reader.IsDBNull(reader.GetOrdinal("AccountCode")) ? string.Empty : reader.GetString(reader.GetOrdinal("AccountCode")),
                                 DetectedName = reader.IsDBNull(reader.GetOrdinal("DetectedName")) ? string.Empty : reader.GetString(reader.GetOrdinal("DetectedName")),
                                 ExcelBalance = reader.GetDecimal(reader.GetOrdinal("ExcelBalance")),
-                                SystemBalanceAtTime = reader.IsDBNull(reader.GetOrdinal("SystemBalanceAtTime")) ? 0 : reader.GetDecimal(reader.GetOrdinal("SystemBalanceAtTime"))
+                                SystemBalanceAtTime = reader.IsDBNull(reader.GetOrdinal("SystemBalanceAtTime")) ? 0 : reader.GetDecimal(reader.GetOrdinal("SystemBalanceAtTime")),
+                                ErrorMessage = reader.IsDBNull(reader.GetOrdinal("ErrorMessage")) ? null : reader.GetString(reader.GetOrdinal("ErrorMessage"))
                             });
                         }
                     }

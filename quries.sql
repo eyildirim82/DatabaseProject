@@ -352,7 +352,9 @@ BEGIN
     SELECT 
         (SELECT COUNT(*) FROM Customers) as TotalCustomers,
         (SELECT ISNULL(SUM(Amount), 0) FROM Transactions WHERE TransactionDate >= CAST(GETDATE() AS DATE)) as TodayCollection,
-        (SELECT COUNT(*) FROM Cheques WHERE Status = 'Portfolio') as PendingCheques;
+        (SELECT COUNT(*) FROM Cheques WHERE Status = 'Portfolio') as PendingCheques,
+        (SELECT ISNULL(SUM(CurrentBalance), 0) FROM Customers WHERE CurrentBalance > 0) as TotalReceivables,
+        (SELECT COUNT(*) FROM vw_CustomerRiskStatus WHERE RiskStatus IN ('Critical', 'Risk Limit Exceeded')) as RiskyCustomerCount;
 END;
 GO
 
@@ -366,6 +368,102 @@ AS
 BEGIN
     INSERT INTO CollectionNotes (CustomerID, UserID, NoteText, PromiseDate)
     VALUES (@CustomerID, @UserID, @NoteText, @PromiseDate);
+END;
+GO
+
+-- SP 9: Add Customer
+CREATE PROCEDURE sp_AddCustomer
+    @AccountCode NVARCHAR(20),
+    @CompanyName NVARCHAR(200),
+    @TaxID NVARCHAR(20),
+    @TaxOffice NVARCHAR(100),
+    @Address NVARCHAR(500),
+    @PhoneNumber NVARCHAR(20),
+    @RiskLimit DECIMAL(18,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    BEGIN TRY
+        -- AccountCode unique kontrolü
+        IF EXISTS (SELECT 1 FROM Customers WHERE AccountCode = @AccountCode)
+        BEGIN
+            RAISERROR('Bu hesap kodu zaten kullanılıyor.', 16, 1);
+            RETURN;
+        END
+        
+        INSERT INTO Customers (AccountCode, CompanyName, TaxID, TaxOffice, Address, PhoneNumber, RiskLimit, CurrentBalance)
+        VALUES (@AccountCode, @CompanyName, @TaxID, @TaxOffice, @Address, @PhoneNumber, @RiskLimit, 0);
+    END TRY
+    BEGIN CATCH
+        THROW;
+    END CATCH
+END;
+GO
+
+-- SP 10: Update Customer
+CREATE PROCEDURE sp_UpdateCustomer
+    @CustomerID INT,
+    @CompanyName NVARCHAR(200),
+    @TaxID NVARCHAR(20),
+    @TaxOffice NVARCHAR(100),
+    @Address NVARCHAR(500),
+    @PhoneNumber NVARCHAR(20),
+    @RiskLimit DECIMAL(18,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM Customers WHERE CustomerID = @CustomerID)
+        BEGIN
+            RAISERROR('Müşteri bulunamadı.', 16, 1);
+            RETURN;
+        END
+        
+        UPDATE Customers
+        SET CompanyName = @CompanyName,
+            TaxID = @TaxID,
+            TaxOffice = @TaxOffice,
+            Address = @Address,
+            PhoneNumber = @PhoneNumber,
+            RiskLimit = @RiskLimit
+        WHERE CustomerID = @CustomerID;
+    END TRY
+    BEGIN CATCH
+        THROW;
+    END CATCH
+END;
+GO
+
+-- SP 11: Delete Customer (Soft delete - sadece risk limitini 0 yapar veya fiziksel silme)
+-- Not: Transaction'lar varsa silme işlemi yapılmamalı
+CREATE PROCEDURE sp_DeleteCustomer
+    @CustomerID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    BEGIN TRY
+        -- Transaction kontrolü
+        IF EXISTS (SELECT 1 FROM Transactions WHERE CustomerID = @CustomerID)
+        BEGIN
+            RAISERROR('Bu müşteriye ait işlem kayıtları bulunduğu için silinemez.', 16, 1);
+            RETURN;
+        END
+        
+        -- Çek kontrolü
+        IF EXISTS (SELECT 1 FROM Cheques WHERE CustomerID = @CustomerID)
+        BEGIN
+            RAISERROR('Bu müşteriye ait çek kayıtları bulunduğu için silinemez.', 16, 1);
+            RETURN;
+        END
+        
+        DELETE FROM Customers WHERE CustomerID = @CustomerID;
+    END TRY
+    BEGIN CATCH
+        THROW;
+    END CATCH
 END;
 GO
 
@@ -601,4 +699,227 @@ BEGIN
         THROW;
     END CATCH
 END;
+GO
+
+-- SP: Collect Cheque (Çek Tahsil Etme)
+-- Çek tahsil edildiğinde transaction oluşturur ve müşteri bakiyesini günceller
+CREATE PROCEDURE sp_CollectCheque
+    @ChequeID INT,
+    @UserID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRANSACTION;
+    
+    BEGIN TRY
+        DECLARE @CustomerID INT;
+        DECLARE @Amount DECIMAL(18,2);
+        DECLARE @MethodID INT;
+        DECLARE @AccountID INT;
+        
+        -- Çek bilgilerini al
+        SELECT @CustomerID = CustomerID, @Amount = Amount
+        FROM Cheques
+        WHERE ChequeID = @ChequeID AND Status = 'Portfolio';
+        
+        IF @CustomerID IS NULL
+        BEGIN
+            RAISERROR('Çek bulunamadı veya tahsil edilemez durumda.', 16, 1);
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END
+        
+        -- Çek ödeme yöntemini bul (MethodID = 2 genellikle "Çek" olabilir, yoksa ilkini al)
+        SELECT TOP 1 @MethodID = MethodID FROM PaymentMethods WHERE MethodName LIKE '%Çek%' OR MethodName LIKE '%Cheque%';
+        IF @MethodID IS NULL
+        BEGIN
+            SELECT TOP 1 @MethodID = MethodID FROM PaymentMethods ORDER BY MethodID;
+        END
+        
+        -- Varsayılan hesap (AccountID NULL olabilir)
+        SET @AccountID = NULL;
+        
+        -- Transaction oluştur (pozitif amount - müşteriden alınan para, alacak azalır)
+        INSERT INTO Transactions (CustomerID, MethodID, AccountID, Amount, CreatedBy, Description)
+        VALUES (@CustomerID, @MethodID, @AccountID, @Amount, @UserID, 
+                'Çek Tahsil Edildi - Çek ID: ' + CAST(@ChequeID AS NVARCHAR(10)));
+        
+        -- Müşteri bakiyesini güncelle (alacak azalır, bu yüzden CurrentBalance azalır)
+        UPDATE Customers
+        SET CurrentBalance = CurrentBalance - @Amount
+        WHERE CustomerID = @CustomerID;
+        
+        -- Çek durumunu güncelle
+        UPDATE Cheques
+        SET Status = 'Collected'
+        WHERE ChequeID = @ChequeID;
+        
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- SP: Mark Cheque Bounced (Çek Karşılıksız)
+-- Çek karşılıksız olduğunda durumu günceller
+CREATE PROCEDURE sp_MarkChequeBounced
+    @ChequeID INT,
+    @UserID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    BEGIN TRY
+        -- Çek durumunu kontrol et
+        IF NOT EXISTS (SELECT 1 FROM Cheques WHERE ChequeID = @ChequeID AND Status = 'Portfolio')
+        BEGIN
+            RAISERROR('Çek bulunamadı veya karşılıksız olarak işaretlenemez durumda.', 16, 1);
+            RETURN;
+        END
+        
+        -- Çek durumunu "Bounced" olarak güncelle
+        UPDATE Cheques
+        SET Status = 'Bounced'
+        WHERE ChequeID = @ChequeID;
+        
+        -- Not: Risk limiti zaten çek eklendiğinde kontrol edildi,
+        -- karşılıksız çek risk limitini etkilemez (sadece durum güncellenir)
+        
+    END TRY
+    BEGIN CATCH
+        THROW;
+    END CATCH
+END;
+GO
+
+-- SP: Reverse Transaction (Transaction İptal)
+-- Mevcut transaction'ı tersine çeviren yeni transaction oluşturur
+CREATE PROCEDURE sp_ReverseTransaction
+    @TransactionID INT,
+    @UserID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRANSACTION;
+    
+    BEGIN TRY
+        DECLARE @CustomerID INT;
+        DECLARE @MethodID INT;
+        DECLARE @AccountID INT;
+        DECLARE @Amount DECIMAL(18,2);
+        DECLARE @Description NVARCHAR(250);
+        
+        -- Orijinal transaction bilgilerini al
+        SELECT @CustomerID = CustomerID, 
+               @MethodID = MethodID, 
+               @AccountID = AccountID, 
+               @Amount = Amount,
+               @Description = Description
+        FROM Transactions
+        WHERE TransactionID = @TransactionID;
+        
+        IF @CustomerID IS NULL
+        BEGIN
+            RAISERROR('Transaction bulunamadı.', 16, 1);
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END
+        
+        -- Tersine çevrilmiş transaction oluştur (Amount * -1)
+        INSERT INTO Transactions (CustomerID, MethodID, AccountID, Amount, CreatedBy, Description)
+        VALUES (@CustomerID, @MethodID, @AccountID, @Amount * -1, @UserID, 
+                'İptal Edildi - Transaction ID: ' + CAST(@TransactionID AS NVARCHAR(10)) + 
+                CASE WHEN @Description IS NOT NULL THEN ' - ' + @Description ELSE '' END);
+        
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;
+GO
+
+-- SP: Change Password (Şifre Değiştirme)
+-- Kullanıcının mevcut şifresini kontrol eder ve yeni şifreyi günceller
+CREATE PROCEDURE sp_ChangePassword
+    @UserID INT,
+    @CurrentPasswordHash NVARCHAR(256),
+    @NewPasswordHash NVARCHAR(256)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    BEGIN TRY
+        -- Mevcut şifreyi kontrol et
+        IF NOT EXISTS (
+            SELECT 1 FROM AppUsers 
+            WHERE UserID = @UserID 
+            AND PasswordHash = @CurrentPasswordHash 
+            AND IsActive = 1
+        )
+        BEGIN
+            RAISERROR('Mevcut şifre hatalı.', 16, 1);
+            RETURN;
+        END
+        
+        -- Yeni şifreyi güncelle
+        UPDATE AppUsers
+        SET PasswordHash = @NewPasswordHash
+        WHERE UserID = @UserID;
+        
+        IF @@ROWCOUNT = 0
+        BEGIN
+            RAISERROR('Şifre güncellenemedi.', 16, 1);
+            RETURN;
+        END
+        
+    END TRY
+    BEGIN CATCH
+        THROW;
+    END CATCH
+END;
+GO
+
+-- Admin Kullanıcısı Ekleme Scripti
+-- Username: admin
+-- Password: admin123
+-- SHA256 Hash: 240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9
+-- Not: Eğer admin kullanıcısı zaten varsa, bu script hata verecektir (güvenlik için)
+IF NOT EXISTS (SELECT 1 FROM AppUsers WHERE Username = 'admin')
+BEGIN
+    INSERT INTO AppUsers (Username, PasswordHash, FullName, RoleID, IsActive)
+    VALUES ('admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'Sistem Yöneticisi', 1, 1);
+    PRINT 'Admin kullanıcısı başarıyla oluşturuldu.';
+END
+ELSE
+BEGIN
+    PRINT 'Admin kullanıcısı zaten mevcut.';
+END
+GO
+
+-- Admin Kullanıcısı Şifre Güncelleme Scripti
+-- Mevcut admin kullanıcısının şifresini admin123 olarak günceller
+-- Username: admin
+-- Yeni Password: admin123
+-- SHA256 Hash: 240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9
+UPDATE AppUsers 
+SET PasswordHash = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'
+WHERE Username = 'admin' AND RoleID = 1;
+PRINT 'Admin kullanıcısı şifresi güncellendi. Yeni şifre: admin123';
+GO
+
+-- ImportDetails tablosuna ErrorMessage kolonu ekleme (eğer yoksa)
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('ImportDetails') AND name = 'ErrorMessage')
+BEGIN
+    ALTER TABLE ImportDetails ADD ErrorMessage NVARCHAR(500) NULL;
+    PRINT 'ErrorMessage kolonu ImportDetails tablosuna eklendi.';
+END
+ELSE
+BEGIN
+    PRINT 'ErrorMessage kolonu zaten mevcut.';
+END
 GO

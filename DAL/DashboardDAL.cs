@@ -35,6 +35,8 @@ namespace DatabaseProject.DAL
                             stats.TotalCustomers = reader.GetInt32(reader.GetOrdinal("TotalCustomers"));
                             stats.TodayCollection = reader.GetDecimal(reader.GetOrdinal("TodayCollection"));
                             stats.PendingCheques = reader.GetInt32(reader.GetOrdinal("PendingCheques"));
+                            stats.TotalReceivables = reader.GetDecimal(reader.GetOrdinal("TotalReceivables"));
+                            stats.RiskyCustomerCount = reader.GetInt32(reader.GetOrdinal("RiskyCustomerCount"));
                         }
                     }
                 }

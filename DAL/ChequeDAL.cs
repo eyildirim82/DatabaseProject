@@ -205,5 +205,60 @@ namespace DatabaseProject.DAL
                 }
             }
         }
+
+        /// <summary>
+        /// Çek tahsil etme (sp_CollectCheque stored procedure ile)
+        /// Transaction oluşturur ve müşteri bakiyesini günceller
+        /// </summary>
+        public void CollectCheque(int chequeId, int userId)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                using (SqlCommand cmd = new SqlCommand("sp_CollectCheque", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@ChequeID", chequeId);
+                    cmd.Parameters.AddWithValue("@UserID", userId);
+
+                    conn.Open();
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                    catch (SqlException ex)
+                    {
+                        throw new Exception($"Çek tahsil edilirken hata oluştu: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Çek karşılıksız olarak işaretleme (sp_MarkChequeBounced stored procedure ile)
+        /// </summary>
+        public void MarkBounced(int chequeId, int userId)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                using (SqlCommand cmd = new SqlCommand("sp_MarkChequeBounced", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@ChequeID", chequeId);
+                    cmd.Parameters.AddWithValue("@UserID", userId);
+
+                    conn.Open();
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                    catch (SqlException ex)
+                    {
+                        throw new Exception($"Çek karşılıksız olarak işaretlenirken hata oluştu: {ex.Message}");
+                    }
+                }
+            }
+        }
     }
 }

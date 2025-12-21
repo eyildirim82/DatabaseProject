@@ -1,18 +1,22 @@
 using Microsoft.AspNetCore.Mvc;
 using DatabaseProject.DAL;
 using DatabaseProject.Models;
+using DatabaseProject.Filters;
 using ClosedXML.Excel;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 
 namespace DatabaseProject.Controllers
 {
+    [SessionCheck]
     public class CustomerController : Controller
     {
         private readonly CustomerDAL _customerDAL;
+        private readonly IConfiguration _configuration;
 
         public CustomerController(IConfiguration configuration)
         {
+            _configuration = configuration;
             _customerDAL = new CustomerDAL(configuration);
         }
 
@@ -22,7 +26,174 @@ namespace DatabaseProject.Controllers
             return View(customers);
         }
 
+        // GET: Customer/Details/5
+        public IActionResult Details(int id)
+        {
+            var customers = _customerDAL.GetAllCustomers();
+            var customer = customers.FirstOrDefault(c => c.CustomerID == id);
+            
+            if (customer == null)
+            {
+                TempData["ErrorMessage"] = "Müşteri bulunamadı.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            // CollectionNotes'ı al
+            var collectionNoteDAL = new CollectionNoteDAL(_configuration);
+            var notes = collectionNoteDAL.GetCollectionNotes(id);
+
+            ViewBag.Customer = customer;
+            ViewBag.Notes = notes;
+            
+            return View();
+        }
+
+        // GET: Customer/Create
+        [RoleCheck(1, 2)] // Admin ve Accountant
+        public IActionResult Create()
+        {
+            return View();
+        }
+
+        // POST: Customer/Create
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [RoleCheck(1, 2)] // Admin ve Accountant
+        public IActionResult Create(string AccountCode, string CompanyName, string? TaxID, string? TaxOffice, 
+            string? Address, string? PhoneNumber, decimal RiskLimit)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(AccountCode) || string.IsNullOrWhiteSpace(CompanyName))
+                {
+                    TempData["ErrorMessage"] = "Hesap Kodu ve Firma Adı zorunludur.";
+                    return View();
+                }
+
+                if (RiskLimit <= 0)
+                {
+                    TempData["ErrorMessage"] = "Risk Limiti pozitif bir değer olmalıdır.";
+                    return View();
+                }
+
+                var customer = new Customer
+                {
+                    AccountCode = AccountCode,
+                    CompanyName = CompanyName,
+                    TaxID = TaxID,
+                    TaxOffice = TaxOffice,
+                    Address = Address,
+                    PhoneNumber = PhoneNumber,
+                    RiskLimit = RiskLimit,
+                    CurrentBalance = 0
+                };
+
+                _customerDAL.AddCustomer(customer);
+                
+                TempData["SuccessMessage"] = "Müşteri başarıyla eklendi.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = ex.Message;
+                return View();
+            }
+        }
+
+        // GET: Customer/Edit/5
+        [RoleCheck(1, 2)] // Admin ve Accountant
+        public IActionResult Edit(int id)
+        {
+            var customer = _customerDAL.GetCustomerById(id);
+            
+            if (customer == null)
+            {
+                TempData["ErrorMessage"] = "Müşteri bulunamadı.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            return View(customer);
+        }
+
+        // POST: Customer/Edit
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [RoleCheck(1, 2)] // Admin ve Accountant
+        public IActionResult Edit(int CustomerID, string CompanyName, string? TaxID, string? TaxOffice, 
+            string? Address, string? PhoneNumber, decimal RiskLimit)
+        {
+            try
+            {
+                var customer = _customerDAL.GetCustomerById(CustomerID);
+                
+                if (customer == null)
+                {
+                    TempData["ErrorMessage"] = "Müşteri bulunamadı.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                if (string.IsNullOrWhiteSpace(CompanyName))
+                {
+                    TempData["ErrorMessage"] = "Firma Adı zorunludur.";
+                    return View(customer);
+                }
+
+                if (RiskLimit <= 0)
+                {
+                    TempData["ErrorMessage"] = "Risk Limiti pozitif bir değer olmalıdır.";
+                    return View(customer);
+                }
+
+                customer.CompanyName = CompanyName;
+                customer.TaxID = TaxID;
+                customer.TaxOffice = TaxOffice;
+                customer.Address = Address;
+                customer.PhoneNumber = PhoneNumber;
+                customer.RiskLimit = RiskLimit;
+
+                _customerDAL.UpdateCustomer(customer);
+                
+                TempData["SuccessMessage"] = "Müşteri başarıyla güncellendi.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = ex.Message;
+                var customer = _customerDAL.GetCustomerById(CustomerID);
+                return View(customer);
+            }
+        }
+
+        // POST: Customer/Delete/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [RoleCheck(1, 2)] // Admin ve Accountant
+        public IActionResult Delete(int id)
+        {
+            try
+            {
+                var customer = _customerDAL.GetCustomerById(id);
+                
+                if (customer == null)
+                {
+                    TempData["ErrorMessage"] = "Müşteri bulunamadı.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                _customerDAL.DeleteCustomer(id);
+                
+                TempData["SuccessMessage"] = "Müşteri başarıyla silindi.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = ex.Message;
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
         [HttpGet]
+        [RoleCheck(1, 2)] // Admin ve Accountant
         public IActionResult ImportExcel(string? statusFilter, string? fileNameFilter, 
             DateTime? startDate, DateTime? endDate, int page = 1, int pageSize = 10, 
             string sortBy = "UploadDate", string sortDirection = "DESC")
@@ -69,6 +240,7 @@ namespace DatabaseProject.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RoleCheck(1, 2)] // Admin ve Accountant
         public async Task<IActionResult> ImportExcel(IFormFile file)
         {
             if (file == null || file.Length == 0)
@@ -217,6 +389,7 @@ namespace DatabaseProject.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RoleCheck(1, 2)] // Admin ve Accountant
         public IActionResult UpdateBatchStatus(int batchId, string status)
         {
             try
@@ -241,6 +414,7 @@ namespace DatabaseProject.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [RoleCheck(1, 2)] // Admin ve Accountant
         public IActionResult DeleteBatch(int batchId)
         {
             try
@@ -332,6 +506,7 @@ namespace DatabaseProject.Controllers
         }
 
         [HttpGet]
+        [RoleCheck(1, 2)] // Admin ve Accountant
         public IActionResult ExportBatchDetails(int id, string format = "excel")
         {
             var batch = _customerDAL.GetImportHistoryWithFilters()
@@ -429,6 +604,127 @@ namespace DatabaseProject.Controllers
 
                 var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
                 return File(bytes, "text/csv", $"Batch_{id}_Detaylar_{DateTime.Now:yyyyMMddHHmmss}.csv");
+            }
+        }
+
+        /// <summary>
+        /// Müşteri listesini Excel formatında export eder
+        /// </summary>
+        [HttpGet]
+        public IActionResult ExportToExcel()
+        {
+            try
+            {
+                var customers = _customerDAL.GetAllCustomers();
+
+                using (var workbook = new XLWorkbook())
+                {
+                    var worksheet = workbook.Worksheets.Add("Müşteri Listesi");
+                    
+                    // Başlıklar
+                    worksheet.Cell(1, 1).Value = "Müşteri ID";
+                    worksheet.Cell(1, 2).Value = "Hesap Kodu";
+                    worksheet.Cell(1, 3).Value = "Şirket Adı";
+                    worksheet.Cell(1, 4).Value = "Vergi No";
+                    worksheet.Cell(1, 5).Value = "Vergi Dairesi";
+                    worksheet.Cell(1, 6).Value = "Adres";
+                    worksheet.Cell(1, 7).Value = "Telefon";
+                    worksheet.Cell(1, 8).Value = "Risk Limiti";
+                    worksheet.Cell(1, 9).Value = "Mevcut Bakiye";
+                    worksheet.Cell(1, 10).Value = "Kullanılabilir Limit";
+
+                    // Stil
+                    var headerRange = worksheet.Range(1, 1, 1, 10);
+                    headerRange.Style.Font.Bold = true;
+                    headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                    // Veriler
+                    int row = 2;
+                    foreach (var customer in customers)
+                    {
+                        worksheet.Cell(row, 1).Value = customer.CustomerID;
+                        worksheet.Cell(row, 2).Value = customer.AccountCode;
+                        worksheet.Cell(row, 3).Value = customer.CompanyName;
+                        worksheet.Cell(row, 4).Value = customer.TaxID ?? "";
+                        worksheet.Cell(row, 5).Value = customer.TaxOffice ?? "";
+                        worksheet.Cell(row, 6).Value = customer.Address ?? "";
+                        worksheet.Cell(row, 7).Value = customer.PhoneNumber ?? "";
+                        worksheet.Cell(row, 8).Value = customer.RiskLimit;
+                        worksheet.Cell(row, 9).Value = customer.CurrentBalance;
+                        worksheet.Cell(row, 10).Value = customer.RiskLimit - customer.CurrentBalance;
+                        row++;
+                    }
+
+                    worksheet.Columns().AdjustToContents();
+
+                    using (var stream = new MemoryStream())
+                    {
+                        workbook.SaveAs(stream);
+                        var content = stream.ToArray();
+                        return File(content, 
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            $"MusteriListesi_{DateTime.Now:yyyyMMddHHmmss}.xlsx");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Excel export sırasında hata oluştu: {ex.Message}";
+                return RedirectToAction("Index");
+            }
+        }
+
+        /// <summary>
+        /// Müşteri listesini PDF formatında export eder
+        /// Not: QuestPDF kullanılabilir, şimdilik basit HTML tablo olarak döndürülüyor
+        /// </summary>
+        [HttpGet]
+        [RoleCheck(1, 2)] // Admin ve Accountant
+        public IActionResult ExportToPdf()
+        {
+            try
+            {
+                var customers = _customerDAL.GetAllCustomers();
+
+                // Basit HTML tablo oluştur (PDF için daha gelişmiş bir kütüphane gerekebilir)
+                var html = new System.Text.StringBuilder();
+                html.AppendLine("<!DOCTYPE html>");
+                html.AppendLine("<html><head><meta charset='utf-8'><title>Müşteri Listesi</title>");
+                html.AppendLine("<style>");
+                html.AppendLine("table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }");
+                html.AppendLine("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }");
+                html.AppendLine("th { background-color: #4CAF50; color: white; font-weight: bold; }");
+                html.AppendLine("tr:nth-child(even) { background-color: #f2f2f2; }");
+                html.AppendLine("h1 { text-align: center; color: #333; }");
+                html.AppendLine("</style></head><body>");
+                html.AppendLine("<h1>Müşteri Listesi</h1>");
+                html.AppendLine($"<p><strong>Tarih:</strong> {DateTime.Now:dd.MM.yyyy HH:mm}</p>");
+                html.AppendLine($"<p><strong>Toplam Müşteri:</strong> {customers.Count}</p>");
+                html.AppendLine("<table>");
+                html.AppendLine("<tr><th>ID</th><th>Hesap Kodu</th><th>Şirket Adı</th><th>Risk Limiti</th><th>Mevcut Bakiye</th><th>Kullanılabilir Limit</th></tr>");
+
+                foreach (var customer in customers)
+                {
+                    html.AppendLine($"<tr>");
+                    html.AppendLine($"<td>{customer.CustomerID}</td>");
+                    html.AppendLine($"<td>{customer.AccountCode}</td>");
+                    html.AppendLine($"<td>{customer.CompanyName}</td>");
+                    html.AppendLine($"<td>{customer.RiskLimit:N2} ₺</td>");
+                    html.AppendLine($"<td>{customer.CurrentBalance:N2} ₺</td>");
+                    html.AppendLine($"<td>{(customer.RiskLimit - customer.CurrentBalance):N2} ₺</td>");
+                    html.AppendLine("</tr>");
+                }
+
+                html.AppendLine("</table>");
+                html.AppendLine("</body></html>");
+
+                var bytes = System.Text.Encoding.UTF8.GetBytes(html.ToString());
+                return File(bytes, "text/html", $"MusteriListesi_{DateTime.Now:yyyyMMddHHmmss}.html");
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"PDF export sırasında hata oluştu: {ex.Message}";
+                return RedirectToAction("Index");
             }
         }
     }

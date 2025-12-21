@@ -57,5 +57,37 @@ namespace DatabaseProject.DAL
             }
             return null; // Kullanıcı bulunamadı
         }
+
+        /// <summary>
+        /// Kullanıcı şifresini değiştirir (sp_ChangePassword stored procedure ile)
+        /// </summary>
+        public bool ChangePassword(int userId, string currentPassword, string newPassword)
+        {
+            string currentPasswordHash = ComputeSha256Hash(currentPassword);
+            string newPasswordHash = ComputeSha256Hash(newPassword);
+
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                using (SqlCommand cmd = new SqlCommand("sp_ChangePassword", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@UserID", userId);
+                    cmd.Parameters.AddWithValue("@CurrentPasswordHash", currentPasswordHash);
+                    cmd.Parameters.AddWithValue("@NewPasswordHash", newPasswordHash);
+
+                    conn.Open();
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+                        return true;
+                    }
+                    catch (SqlException ex)
+                    {
+                        throw new Exception($"Şifre değiştirilirken hata oluştu: {ex.Message}");
+                    }
+                }
+            }
+        }
     }
 }

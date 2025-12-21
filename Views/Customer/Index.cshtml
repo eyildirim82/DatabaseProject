@@ -9,9 +9,30 @@
         <h2 class="mb-0">
             <i class="bi bi-people-fill me-2"></i>Müşteri Listesi
         </h2>
-        <a asp-action="ImportExcel" class="btn btn-primary">
-            <i class="bi bi-file-earmark-excel me-1"></i>Excel Yükle
-        </a>
+        <div>
+            @{
+                var roleId = Context.Session.GetInt32("RoleID");
+                bool isAdminOrAccountant = roleId == 1 || roleId == 2;
+            }
+            @if (isAdminOrAccountant)
+            {
+                <a asp-action="Create" class="btn btn-primary me-2">
+                    <i class="bi bi-plus-circle me-1"></i>Yeni Müşteri
+                </a>
+            }
+            <a asp-action="ExportToExcel" class="btn btn-success me-2">
+                <i class="bi bi-file-earmark-excel me-1"></i>Excel İndir
+            </a>
+            <a asp-action="ExportToPdf" class="btn btn-danger me-2">
+                <i class="bi bi-file-earmark-pdf me-1"></i>PDF İndir
+            </a>
+            @if (isAdminOrAccountant)
+            {
+                <a asp-action="ImportExcel" class="btn btn-primary">
+                    <i class="bi bi-file-earmark-arrow-up me-1"></i>Excel Yükle
+                </a>
+            }
+        </div>
     </div>
 
     @if (TempData["SuccessMessage"] != null)
@@ -43,6 +64,7 @@
                             <th class="text-end">Risk Limiti</th>
                             <th class="text-end">Mevcut Bakiye</th>
                             <th class="text-end">Kullanılabilir Risk</th>
+                            <th>İşlemler</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -52,7 +74,13 @@
                             {
                                 <tr>
                                     <td><code>@customer.AccountCode</code></td>
-                                    <td><strong>@customer.CompanyName</strong></td>
+                                    <td>
+                                        <strong>
+                                            <a asp-action="Details" asp-route-id="@customer.CustomerID" class="text-decoration-none">
+                                                @customer.CompanyName
+                                            </a>
+                                        </strong>
+                                    </td>
                                     <td>@(customer.TaxID ?? "-")</td>
                                     <td>@(customer.PhoneNumber ?? "-")</td>
                                     <td class="text-end">@customer.RiskLimit.ToString("N2") ₺</td>
@@ -71,13 +99,32 @@
                                             <span class="badge bg-success">@customer.AvailableRisk.ToString("N2") ₺</span>
                                         }
                                     </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a asp-action="Details" asp-route-id="@customer.CustomerID" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i> Detay
+                                            </a>
+                                            @if (isAdminOrAccountant)
+                                            {
+                                                <a asp-action="Edit" asp-route-id="@customer.CustomerID" class="btn btn-sm btn-outline-warning">
+                                                    <i class="bi bi-pencil"></i> Düzenle
+                                                </a>
+                                                <form asp-action="Delete" asp-route-id="@customer.CustomerID" method="post" class="d-inline" onsubmit="return confirm('Bu müşteriyi silmek istediğinize emin misiniz? İşlem geri alınamaz.');">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="bi bi-trash"></i> Sil
+                                                    </button>
+                                                </form>
+                                            }
+                                        </div>
+                                    </td>
                                 </tr>
                             }
                         }
                         else
                         {
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4">
+                                <td colspan="8" class="text-center text-muted py-4">
                                     <i class="bi bi-inbox display-6 d-block mb-2"></i>
                                     Henüz müşteri kaydı bulunmuyor.
                                 </td>

@@ -8,6 +8,7 @@ namespace DatabaseProject.Models
         public string DetectedName { get; set; } = string.Empty;
         public decimal ExcelBalance { get; set; }
         public decimal SystemBalanceAtTime { get; set; }
+        public string? ErrorMessage { get; set; }
         
         // Computed property
         public decimal BalanceDifference => ExcelBalance - SystemBalanceAtTime;
