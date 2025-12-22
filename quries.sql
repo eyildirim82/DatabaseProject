@@ -314,10 +314,21 @@ CREATE PROCEDURE sp_GetCustomerStatement
     @EndDate DATE
 AS
 BEGIN
-    SELECT * FROM Transactions 
-    WHERE CustomerID = @CustomerID 
-      AND TransactionDate BETWEEN @StartDate AND @EndDate
-    ORDER BY TransactionDate DESC;
+    SELECT 
+        t.TransactionID,
+        t.CustomerID,
+        t.MethodID,
+        pm.MethodName,
+        t.AccountID,
+        t.Amount,
+        t.Description,
+        t.TransactionDate,
+        t.CreatedBy
+    FROM Transactions t
+    INNER JOIN PaymentMethods pm ON t.MethodID = pm.MethodID
+    WHERE t.CustomerID = @CustomerID 
+      AND t.TransactionDate BETWEEN @StartDate AND @EndDate
+    ORDER BY t.TransactionDate DESC;
 END;
 GO
 

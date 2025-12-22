@@ -1,102 +1,99 @@
-# Project Specification Document (PSD)
+Software Requirements Specification (SRS)
+Project Name: DistributorFinanceDB Version: 1.2 (Final Release) Date: 22.12.2025
 
-| **Project Name** | Distributor Finance Management System (DFMS) |
-| :--- | :--- |
-| **Course** | CSE3055 Database Systems |
-| **Term** | Fall 2025 |
-| **Domain** | Industrial Automation Distribution (B2B) |
-| **Version** | 1.0.0 |
-| **Status** | In Development |
+1. Giriş (Introduction)
+1.1 Amaç (Purpose)
+Bu doküman, DistributorFinanceDB (Cari Risk ve Finans Yönetim Sistemi) projesinin yazılım gereksinimlerini tanımlar. Sistem, KOBİ ölçeğindeki dağıtım firmalarının nakit akışını, müşteri risklerini ve banka mutabakatlarını dijitalleştirmeyi amaçlar.
 
----
+1.2 Kapsam (Scope)
+Sistem, aşağıdaki temel modülleri içerir:
 
-## 1. Executive Summary
-This project aims to develop a comprehensive financial management database application for a distributor company in the industrial electronics sector (Reference: EKSEN Endüstriyel). The system digitizes current account tracking, dynamic risk management, cheque maturity lifecycles, and automates bank reconciliation processes via Excel integration.
+Cari Yönetim: Müşteri kartları ve bakiye takibi.
 
-The core objective is to replace manual Excel-based tracking with a secure, transactional database system that enforces business rules (e.g., stopping sales when risk limits are exceeded) and ensures data integrity through ACID-compliant transactions.
+Finansal İşlemler: Tahsilat, tediye ve virman kayıtları.
 
-## 2. Team Members
-* **GrRep:** Doğukan Demir (150122539)
-* **Member 2:** Erkan Yıldırım (150119509)
-* **Member 3:** Fatih Kaba (150120057)
+Mutabakat (Reconciliation): Banka Excel ekstrelerinin sisteme işlenmesi.
 
----
+Raporlama: Yönetici paneli (Dashboard) ve Muhasebe Entegrasyon çıktıları.
 
-## 3. Functional Requirements & Modules
+2. Genel Bakış (Overall Description)
+2.1 Ürün Perspektifi (Product Perspective)
+DistributorFinanceDB, kurumsal intranet üzerinde çalışan, merkezi bir MS SQL Server veritabanına bağlı bağımsız bir web uygulamasıdır. Harici bir donanım veya istemci tarafında MS Office kurulumu gerektirmez.
 
-### 3.1. Authentication & Authorization (Auth)
-* **User Management:** System access via `AppUsers` table with hashed passwords.
-* **Role-Based Access Control (RBAC):**
-    * `Admin`: Full system access, audit log viewing.
-    * `Accountant`: Payment entry, reconciliation, cheque status updates.
-    * `Sales Rep`: Read-only access to customer balances, CRM note entry.
-* **Audit Logging:** Critical data changes (Deletes/Updates) are recorded in `SystemLogs` with `OldValue` and `NewValue`.
+2.2 Kullanıcı Karakteristikleri (User Characteristics)
+Admin: Sistem yapılandırması ve kullanıcı yönetimi.
 
-### 3.2. Customer & Risk Management
-* **Customer Profile:** Management of Company Name, Tax ID, and Address.
-* **Dynamic Risk Logic:**
-    * Each customer has a defined `RiskLimit`.
-    * `AvailableRisk` is automatically calculated (`RiskLimit - CurrentBalance`).
-    * **Constraint:** The system prevents any transaction (Invoice/Cheque) that causes the balance to exceed the risk limit.
+Muhasebe: Günlük finansal işlem girişi ve Excel mutabakatı.
 
-### 3.3. Financial Transactions
-* **Transaction Types:** Cash, Bank Transfer, Credit Card.
-* **Real-time Balance Updates:** A database trigger (`trg_UpdateBalance_AfterPayment`) automatically updates the Customer's master balance upon any transaction entry.
-* **Validation:** Negative amounts are strictly prohibited via database constraints.
+Satış Temsilcisi: Bakiye sorgulama ve müşteri notu ekleme.
 
-### 3.4. Cheque Lifecycle Management
-* **Entry:** Recording post-dated cheques with `DueDate` and `BankName`.
-* **Status Workflow:** Cheques transition through statuses:
-    `Portfolio` -> `Collected` (Updates Balance) OR `Bounced` (Alerts Risk).
-* **Reporting:** `vw_PortfolioCheques` provides a list of cheques nearing maturity.
+2.3 Varsayımlar ve Kısıtlamalar (Assumptions & Constraints)
+İstemci: Modern bir web tarayıcısı (Chrome, Edge, Firefox) yeterlidir.
 
-### 3.5. Automated Reconciliation (Core Feature)
-* **Excel Import:** Bulk upload of external bank/accounting statements (`.xlsx`).
-* **Batch Processing:** Uploads are tracked in `ImportBatches` and `ImportDetails`.
-* **Conflict Resolution:**
-    * The system compares Excel balances against Database balances.
-    * Differences are highlighted for user approval.
-    * Approved differences update the system balance via a transactional Stored Procedure (`sp_ProcessReconciliation`).
+Bağımlılık: Sunucu tarafında .NET 8.0 Runtime ve SQL Server 2019+ gereklidir.
 
----
+Dil: Kullanıcı arayüzü dili Türkçedir.
 
-## 4. Technical Architecture
+3. Sistem Özellikleri (Functional Requirements)
+3.1 FR-01: Cari Hesap ve Risk Yönetimi
+Gereksinim: Sistem, işlem anında müşterinin güncel bakiyesini ve tanımlı risk limitini kontrol etmelidir.
 
-### 4.1. Technology Stack
-* **Backend Framework:** .NET 8.0 / ASP.NET Core MVC
-* **Database Engine:** Microsoft SQL Server 2019+
-* **Data Access:** ADO.NET with Stored Procedures (DAL Pattern)
-    * *Note: Entity Framework is strictly avoided for core financial logic to ensure performance and explicit SQL control.*
-* **Frontend:** Razor Views, Bootstrap 5, jQuery.
-* **External Libraries:** `ClosedXML` (for Excel processing).
+İş Kuralı: Risk limitini aşan vadeli işlem girişleri (INSERT) veritabanı seviyesinde engellenmeli ve kullanıcıya hata mesajı gösterilmelidir.
 
-### 4.2. Database Design Statistics
-* **Tables:** 12 Tables (Normalized to 3NF).
-* **Stored Procedures:** 10+ (Logic encapsulation).
-* **Triggers:** 2 (Balance automation & Security auditing).
-* **Views:** 4 (Reporting).
-* **Security:** SQL Injection protection via `SqlParameter` usage.
 
----
+Teknik Karşılık: sp_AddChequeWithRiskCheck ve CK_RiskLimit_Positive .
 
-## 5. Gap Analysis & Roadmap
 
-The following features are identified as necessary to complete the project scope:
+3.2 FR-02: Veri Bütünlüğü ve Silme Politikası (Strict Policy)
+Gereksinim: Finansal tutarlılığı korumak adına, işlem görmüş kayıtların silinmesi engellenmelidir.
 
-| Feature | Status | Priority | Description |
-| :--- | :--- | :--- | :--- |
-| **Database Schema** | ✅ Completed | - | Tables, SPs, Triggers are created in SQL. |
-| **Excel Import Backend** | 🔄 In Progress | High | `ImportBatch` logic in DAL and Controller. |
-| **Excel Import UI** | ❌ Pending | High | The interface to upload files and view results. |
-| **Dashboard UI** | ❌ Pending | Medium | Charts showing Risk Status and Daily Cash Flow. |
-| **Transaction UI** | ❌ Pending | Medium | Forms to add Payments/Cheques with error handling. |
-| **Audit Log UI** | ❌ Pending | Low | Admin screen to view `SystemLogs` table. |
+İş Kuralı (Strict): Eğer bir müşteriye ait Transactions veya Cheques tablosunda en az bir kayıt varsa, o müşteri kartı asla silinemez. Sistem bu durumda Foreign Key hatası veya özel bir iş kuralı hatası fırlatmalıdır.
 
----
+Teknik Karşılık: sp_DeleteCustomer prosedürü içindeki EXISTS kontrolleri.
 
-## 6. Business Rules & Constraints
+3.3 FR-03: Excel Banka Mutabakatı (Reconciliation)
+Gereksinim: Kullanıcılar, banka formatındaki .xlsx dosyalarını sisteme yükleyebilmelidir.
 
-1.  **Risk Limit Integrity:** A customer's `CurrentBalance` can never exceed `RiskLimit` through manual entry.
-2.  **Reconciliation Safety:** A newer reconciliation file cannot be processed if it is older than the last processed file timestamp.
-3.  **Data Immutability:** `Transactions` cannot be physically deleted by standard users; they are soft-deleted or reverse-entered (Audit Trigger active).
-4.  **Cheque States:** A cheque cannot jump from `Portfolio` to `Bounced` without a manual intervention record.
+İş Kuralı: Sistem, yüklenen dosyadaki verileri Regex ile ayrıştırmalı, mevcut bakiyelerle karşılaştırmalı ve farkları raporlamalıdır. İstemci bilgisayarda Excel yüklü olma zorunluluğu yoktur.
+
+Teknik Karşılık: ClosedXML kütüphanesi ve ImportBatches tablosu.
+
+3.4 FR-04: Ters Kayıt (Reverse Entry) Mekanizması
+Gereksinim: Hatalı girilen finansal işlemler fiziksel olarak silinmemeli, muhasebe standartlarına uygun olarak ters kayıtla nötrlenmelidir.
+
+İş Kuralı: İptal edilen işlemin tutarı negatif (-) işaretli olarak yeni bir kayıt şeklinde eklenir.
+
+4. Dış Arayüz Gereksinimleri (External Interface Requirements)
+4.1 Kullanıcı Arayüzleri
+Sistem, HTML5 ve Bootstrap 5 standartlarına uygun, sade ve odaklı bir web arayüzü sunacaktır.
+
+Mobil uyumluluk (Responsive Design) desteklenecektir ancak öncelikli kullanım masaüstü tarayıcılardır.
+
+4.2 Yazılım Arayüzleri
+Veritabanı İletişimi: Tüm veri işlemleri ADO.NET ve Stored Procedures üzerinden yürütülecektir. ORM (Entity Framework) kullanılmayarak ham SQL performansı hedeflenmiştir.
+
+Dışa Aktarım: Sistem, muhasebe programları için .xlsx formatında veri üretecektir. PDF formatında ekstre çıktısı kapsam dışıdır.
+
+5. Kalite Nitelikleri (Non-Functional Requirements)
+5.1 Performans
+Sistem, 5 eşzamanlı kullanıcının veri girişini <2 saniye tepki süresi ile karşılamalıdır.
+
+Excel import işlemlerinde 1000 satıra kadar olan dosyalar <30 saniye içinde işlenmelidir.
+
+5.2 Güvenlik
+Şifreler veritabanında SHA-256 algoritması ile hashlenmiş olarak saklanacaktır.
+
+SQL Injection saldırılarına karşı tüm parametreler SqlParameter nesneleri ile kapsüllenecektir.
+
+6. Tasarım Kısıtlamaları (Design Constraints)
+Proje, aşağıdaki teknoloji yığınına sadık kalarak geliştirilmiştir:
+
+Backend: ASP.NET Core (.NET 8.0)
+
+Veritabanı: Microsoft SQL Server 2019
+
+Frontend: HTML5, CSS3, JavaScript (jQuery), Bootstrap 5
+
+Veri Erişim: ADO.NET (Native SQL)
+
+Kütüphaneler: ClosedXML (Excel İşlemleri)

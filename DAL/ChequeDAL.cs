@@ -260,5 +260,33 @@ namespace DatabaseProject.DAL
                 }
             }
         }
+
+        /// <summary>
+        /// Çek iade etme (sp_UpdateChequeStatus stored procedure ile)
+        /// Status'u "Returned" yapar, trigger otomatik olarak bakiyeyi düzeltecek
+        /// </summary>
+        public void ReturnCheque(int chequeId, int userId)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                using (SqlCommand cmd = new SqlCommand("sp_UpdateChequeStatus", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@ChequeID", chequeId);
+                    cmd.Parameters.AddWithValue("@NewStatus", "Returned");
+
+                    conn.Open();
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                    catch (SqlException ex)
+                    {
+                        throw new Exception($"Çek iade edilirken hata oluştu: {ex.Message}");
+                    }
+                }
+            }
+        }
     }
 }

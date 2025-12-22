@@ -155,5 +155,25 @@ namespace DatabaseProject.DAL
 
             return riskStatuses;
         }
+
+        /// <summary>
+        /// Vadesi geçen çek sayısını getirir
+        /// </summary>
+        public int GetOverdueChequesCount()
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                string query = @"SELECT COUNT(*) 
+                                FROM Cheques 
+                                WHERE Status = 'Portfolio' 
+                                  AND DueDate < GETDATE()";
+
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    conn.Open();
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+                }
+            }
+        }
     }
 }

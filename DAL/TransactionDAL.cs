@@ -71,8 +71,21 @@ namespace DatabaseProject.DAL
                     catch (SqlException ex)
                     {
                         // SQL Server'dan gelen özel hataları yakala (Risk Limiti vb.)
-                        // Hoca bu hatayı arayüzde görmek isteyecek.
-                        throw new Exception($"Veritabanı Hatası: {ex.Message}");
+                        // Hata mesajını kullanıcı dostu hale getir
+                        string errorMessage = ex.Message;
+                        if (errorMessage.Contains("Risk Limit") || errorMessage.Contains("Limit Exceeded"))
+                        {
+                            errorMessage = "İşlem reddedildi: Müşteri risk limiti aşıldı. Lütfen müşteri risk limitini kontrol edin.";
+                        }
+                        else if (errorMessage.Contains("CHECK constraint"))
+                        {
+                            errorMessage = "İşlem reddedildi: Geçersiz veri girişi. Lütfen girdiğiniz değerleri kontrol edin.";
+                        }
+                        else
+                        {
+                            errorMessage = $"İşlem sırasında hata oluştu: {ex.Message}";
+                        }
+                        throw new Exception(errorMessage);
                     }
                 }
             }

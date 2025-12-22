@@ -25,18 +25,12 @@
 
     @if (TempData["SuccessMessage"] != null)
     {
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="bi bi-check-circle me-2"></i>@TempData["SuccessMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <div data-tempdata-success style="display: none;">@TempData["SuccessMessage"]</div>
     }
 
     @if (TempData["ErrorMessage"] != null)
     {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <div data-tempdata-error style="display: none;">@TempData["ErrorMessage"]</div>
     }
 
     @if (customer != null)
@@ -123,7 +117,7 @@
         </div>
 
         <!-- CRM Notları -->
-        <div class="card shadow-sm">
+        <div class="card shadow-sm mb-4">
             <div class="card-header bg-info text-white">
                 <h5 class="mb-0">
                     <i class="bi bi-sticky me-2"></i>CRM Notları (@notes.Count)
@@ -188,6 +182,60 @@
                     <div class="alert alert-info mb-0">
                         <i class="bi bi-info-circle me-2"></i>Bu müşteri için henüz not kaydı bulunmamaktadır.
                         <a asp-controller="CollectionNote" asp-action="Create" asp-route-customerId="@customer.CustomerID" class="alert-link ms-2">İlk notu ekleyin</a>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- İşlem Geçmişi (Transaction History) -->
+        @{
+            var transactions = ViewBag.Transactions as List<DatabaseProject.Models.Transaction> ?? new List<DatabaseProject.Models.Transaction>();
+        }
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history me-2"></i>İşlem Geçmişi (Son 30 Gün) (@transactions.Count)
+                </h5>
+            </div>
+            <div class="card-body">
+                @if (transactions.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Tarih</th>
+                                    <th>Tutar</th>
+                                    <th>Ödeme Yöntemi</th>
+                                    <th>Açıklama</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var transaction in transactions)
+                                {
+                                    <tr>
+                                        <td>@transaction.TransactionDate.ToString("dd.MM.yyyy HH:mm")</td>
+                                        <td class="text-end">
+                                            <span class="@(transaction.Amount < 0 ? "text-danger" : "text-success")">
+                                                @transaction.Amount.ToString("N2") ₺
+                                            </span>
+                                        </td>
+                                        <td>@transaction.MethodName</td>
+                                        <td>
+                                            <div style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="@transaction.Description">
+                                                @(transaction.Description ?? "-")
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle me-2"></i>Bu müşteri için son 30 gün içinde işlem kaydı bulunmamaktadır.
                     </div>
                 }
             </div>

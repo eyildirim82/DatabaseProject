@@ -18,7 +18,19 @@ namespace DatabaseProject.Controllers
 
         public IActionResult Index()
         {
-            return View();
+            try
+            {
+                var stats = _dashboardDAL.GetDashboardStats();
+                var overdueChequesCount = _dashboardDAL.GetOverdueChequesCount();
+                
+                ViewBag.OverdueChequesCount = overdueChequesCount;
+                return View(stats);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Ana sayfa yüklenirken hata oluştu: {ex.Message}";
+                return View(new DashboardStats());
+            }
         }
 
         public IActionResult Dashboard()

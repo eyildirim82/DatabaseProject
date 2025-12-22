@@ -14,12 +14,6 @@
                 var roleId = Context.Session.GetInt32("RoleID");
                 bool isAdminOrAccountant = roleId == 1 || roleId == 2;
             }
-            @if (isAdminOrAccountant)
-            {
-                <a asp-action="Create" class="btn btn-primary me-2">
-                    <i class="bi bi-plus-circle me-1"></i>Yeni Müşteri
-                </a>
-            }
             <a asp-action="ExportToExcel" class="btn btn-success me-2">
                 <i class="bi bi-file-earmark-excel me-1"></i>Excel İndir
             </a>
@@ -37,18 +31,12 @@
 
     @if (TempData["SuccessMessage"] != null)
     {
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="bi bi-check-circle me-2"></i>@TempData["SuccessMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <div data-tempdata-success style="display: none;">@TempData["SuccessMessage"]</div>
     }
 
     @if (TempData["ErrorMessage"] != null)
     {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <div data-tempdata-error style="display: none;">@TempData["ErrorMessage"]</div>
     }
 
     <div class="card shadow-sm">

@@ -42,62 +42,14 @@ namespace DatabaseProject.Controllers
             var collectionNoteDAL = new CollectionNoteDAL(_configuration);
             var notes = collectionNoteDAL.GetCollectionNotes(id);
 
+            // Transaction History'yi al (son 30 günlük)
+            var transactions = _customerDAL.GetCustomerStatement(id);
+
             ViewBag.Customer = customer;
             ViewBag.Notes = notes;
+            ViewBag.Transactions = transactions;
             
             return View();
-        }
-
-        // GET: Customer/Create
-        [RoleCheck(1, 2)] // Admin ve Accountant
-        public IActionResult Create()
-        {
-            return View();
-        }
-
-        // POST: Customer/Create
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [RoleCheck(1, 2)] // Admin ve Accountant
-        public IActionResult Create(string AccountCode, string CompanyName, string? TaxID, string? TaxOffice, 
-            string? Address, string? PhoneNumber, decimal RiskLimit)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(AccountCode) || string.IsNullOrWhiteSpace(CompanyName))
-                {
-                    TempData["ErrorMessage"] = "Hesap Kodu ve Firma Adı zorunludur.";
-                    return View();
-                }
-
-                if (RiskLimit <= 0)
-                {
-                    TempData["ErrorMessage"] = "Risk Limiti pozitif bir değer olmalıdır.";
-                    return View();
-                }
-
-                var customer = new Customer
-                {
-                    AccountCode = AccountCode,
-                    CompanyName = CompanyName,
-                    TaxID = TaxID,
-                    TaxOffice = TaxOffice,
-                    Address = Address,
-                    PhoneNumber = PhoneNumber,
-                    RiskLimit = RiskLimit,
-                    CurrentBalance = 0
-                };
-
-                _customerDAL.AddCustomer(customer);
-                
-                TempData["SuccessMessage"] = "Müşteri başarıyla eklendi.";
-                return RedirectToAction(nameof(Index));
-            }
-            catch (Exception ex)
-            {
-                TempData["ErrorMessage"] = ex.Message;
-                return View();
-            }
         }
 
         // GET: Customer/Edit/5

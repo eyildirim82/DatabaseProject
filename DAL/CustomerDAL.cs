@@ -786,5 +786,58 @@ namespace DatabaseProject.DAL
             cmd.Parameters.AddWithValue("@Address", (object?)customer.Address ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@PhoneNumber", (object?)customer.PhoneNumber ?? DBNull.Value);
         }
+
+        /// <summary>
+        /// Müşteri işlem geçmişini getirir (sp_GetCustomerStatement stored procedure ile)
+        /// </summary>
+        public List<Transaction> GetCustomerStatement(int customerId, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            var transactions = new List<Transaction>();
+
+            // Varsayılan olarak son 30 günlük işlemleri getir
+            if (startDate == null)
+            {
+                startDate = DateTime.Now.AddDays(-30);
+            }
+            if (endDate == null)
+            {
+                endDate = DateTime.Now;
+            }
+
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                using (SqlCommand cmd = new SqlCommand("sp_GetCustomerStatement", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@CustomerID", customerId);
+                    cmd.Parameters.AddWithValue("@StartDate", startDate.Value.Date);
+                    cmd.Parameters.AddWithValue("@EndDate", endDate.Value.Date);
+
+                    conn.Open();
+
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            transactions.Add(new Transaction
+                            {
+                                TransactionID = reader.GetInt32(reader.GetOrdinal("TransactionID")),
+                                CustomerID = reader.GetInt32(reader.GetOrdinal("CustomerID")),
+                                MethodID = reader.GetInt32(reader.GetOrdinal("MethodID")),
+                                MethodName = reader.GetString(reader.GetOrdinal("MethodName")),
+                                AccountID = reader.IsDBNull(reader.GetOrdinal("AccountID")) ? null : reader.GetInt32(reader.GetOrdinal("AccountID")),
+                                Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
+                                Description = reader.IsDBNull(reader.GetOrdinal("Description")) ? null : reader.GetString(reader.GetOrdinal("Description")),
+                                TransactionDate = reader.GetDateTime(reader.GetOrdinal("TransactionDate")),
+                                CreatedBy = reader.GetInt32(reader.GetOrdinal("CreatedBy"))
+                            });
+                        }
+                    }
+                }
+            }
+
+            return transactions;
+        }
     }
 }

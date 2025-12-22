@@ -19,18 +19,12 @@
 
     @if (TempData["SuccessMessage"] != null)
     {
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="bi bi-check-circle me-2"></i>@TempData["SuccessMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <div data-tempdata-success style="display: none;">@TempData["SuccessMessage"]</div>
     }
 
     @if (TempData["ErrorMessage"] != null)
     {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-circle me-2"></i>@TempData["ErrorMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <div data-tempdata-error style="display: none;">@TempData["ErrorMessage"]</div>
     }
 
     <!-- Filtreleme -->
@@ -127,6 +121,12 @@
                                                     @Html.AntiForgeryToken()
                                                     <button type="submit" class="btn btn-sm btn-danger">
                                                         <i class="bi bi-x-circle"></i> Karşılıksız
+                                                    </button>
+                                                </form>
+                                                <form asp-action="ReturnCheque" asp-route-id="@cheque.ChequeID" method="post" class="d-inline" onsubmit="return confirm('Bu çeki iade etmek istediğinize emin misiniz?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-warning">
+                                                        <i class="bi bi-arrow-return-left"></i> İade
                                                     </button>
                                                 </form>
                                             }

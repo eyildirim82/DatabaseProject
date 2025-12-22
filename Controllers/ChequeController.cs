@@ -240,6 +240,47 @@ namespace DatabaseProject.Controllers
             }
         }
 
+        // POST: Cheque/ReturnCheque/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ReturnCheque(int id)
+        {
+            try
+            {
+                var cheque = _chequeDAL.GetChequeById(id);
+                
+                if (cheque == null)
+                {
+                    TempData["ErrorMessage"] = "Çek bulunamadı.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                if (cheque.Status != "Portfolio")
+                {
+                    TempData["ErrorMessage"] = "Sadece Portfolio durumundaki çekler iade edilebilir.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // UserID'yi Session'dan al
+                int? sessionUserId = HttpContext.Session.GetInt32("UserID");
+                if (sessionUserId == null)
+                {
+                    TempData["ErrorMessage"] = "Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                _chequeDAL.ReturnCheque(id, sessionUserId.Value);
+                
+                TempData["SuccessMessage"] = "Çek başarıyla iade edildi ve bakiye güncellendi.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Çek iade edilirken hata oluştu: {ex.Message}";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
         private void LoadDropdowns()
         {
             var customers = _customerDAL.GetAllCustomers();
