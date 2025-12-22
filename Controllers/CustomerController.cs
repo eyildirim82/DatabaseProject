@@ -52,98 +52,6 @@ namespace DatabaseProject.Controllers
             return View();
         }
 
-        // GET: Customer/Edit/5
-        [RoleCheck(1, 2)] // Admin ve Accountant
-        public IActionResult Edit(int id)
-        {
-            var customer = _customerDAL.GetCustomerById(id);
-            
-            if (customer == null)
-            {
-                TempData["ErrorMessage"] = "Müşteri bulunamadı.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            return View(customer);
-        }
-
-        // POST: Customer/Edit
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [RoleCheck(1, 2)] // Admin ve Accountant
-        public IActionResult Edit(int CustomerID, string CompanyName, string? TaxID, string? TaxOffice, 
-            string? Address, string? PhoneNumber, decimal RiskLimit)
-        {
-            try
-            {
-                var customer = _customerDAL.GetCustomerById(CustomerID);
-                
-                if (customer == null)
-                {
-                    TempData["ErrorMessage"] = "Müşteri bulunamadı.";
-                    return RedirectToAction(nameof(Index));
-                }
-
-                if (string.IsNullOrWhiteSpace(CompanyName))
-                {
-                    TempData["ErrorMessage"] = "Firma Adı zorunludur.";
-                    return View(customer);
-                }
-
-                if (RiskLimit <= 0)
-                {
-                    TempData["ErrorMessage"] = "Risk Limiti pozitif bir değer olmalıdır.";
-                    return View(customer);
-                }
-
-                customer.CompanyName = CompanyName;
-                customer.TaxID = TaxID;
-                customer.TaxOffice = TaxOffice;
-                customer.Address = Address;
-                customer.PhoneNumber = PhoneNumber;
-                customer.RiskLimit = RiskLimit;
-
-                _customerDAL.UpdateCustomer(customer);
-                
-                TempData["SuccessMessage"] = "Müşteri başarıyla güncellendi.";
-                return RedirectToAction(nameof(Index));
-            }
-            catch (Exception ex)
-            {
-                TempData["ErrorMessage"] = ex.Message;
-                var customer = _customerDAL.GetCustomerById(CustomerID);
-                return View(customer);
-            }
-        }
-
-        // POST: Customer/Delete/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [RoleCheck(1, 2)] // Admin ve Accountant
-        public IActionResult Delete(int id)
-        {
-            try
-            {
-                var customer = _customerDAL.GetCustomerById(id);
-                
-                if (customer == null)
-                {
-                    TempData["ErrorMessage"] = "Müşteri bulunamadı.";
-                    return RedirectToAction(nameof(Index));
-                }
-
-                _customerDAL.DeleteCustomer(id);
-                
-                TempData["SuccessMessage"] = "Müşteri başarıyla silindi.";
-                return RedirectToAction(nameof(Index));
-            }
-            catch (Exception ex)
-            {
-                TempData["ErrorMessage"] = ex.Message;
-                return RedirectToAction(nameof(Index));
-            }
-        }
-
         [HttpGet]
         [RoleCheck(1, 2)] // Admin ve Accountant
         public IActionResult ImportExcel(string? statusFilter, string? fileNameFilter, 
@@ -238,36 +146,6 @@ namespace DatabaseProject.Controllers
 
             try
             {
-                // Excel dosyasını oku ve satır sayısını hesapla
-                int totalRecords = 0;
-                
-                if (extension == ".xlsx" || extension == ".xls")
-                {
-                    using (var stream = file.OpenReadStream())
-                    using (var workbook = new XLWorkbook(stream))
-                    {
-                        foreach (var worksheet in workbook.Worksheets)
-                        {
-                            var usedRange = worksheet.RangeUsed();
-                            if (usedRange != null)
-                            {
-                                totalRecords = usedRange.RowCount();
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    // Text dosyaları için satır sayısını hesapla
-                    using (var reader = new StreamReader(file.OpenReadStream(), System.Text.Encoding.UTF8, true))
-                    {
-                        while (await reader.ReadLineAsync() != null)
-                        {
-                            totalRecords++;
-                        }
-                    }
-                }
-
                 // UserID'yi Session'dan al (Session yoksa veya UserID yoksa default 1 kullan)
                 int userId = 1; // Default Admin user ID
                 if (HttpContext.Session != null && HttpContext.Session.IsAvailable)
@@ -275,10 +153,35 @@ namespace DatabaseProject.Controllers
                     userId = HttpContext.Session.GetInt32("UserID") ?? 1;
                 }
 
-                // DAL'daki CreateImportBatch metodunu çağır
-                int batchId = await _customerDAL.CreateImportBatchAsync(fileName, fileTimestamp, userId, totalRecords);
+                // Dosya içeriğini oku
+                string fileContent;
+                
+                if (extension == ".xlsx" || extension == ".xls")
+                {
+                    // Excel dosyasını text formatına çevir
+                    fileContent = ReadExcelAsText(file);
+                }
+                else
+                {
+                    // Text dosyaları için içeriği oku
+                    using (var reader = new StreamReader(file.OpenReadStream(), System.Text.Encoding.UTF8, true))
+                    {
+                        fileContent = await reader.ReadToEndAsync();
+                    }
+                }
 
-                TempData["SuccessMessage"] = $"Dosya başarıyla yüklendi! Batch ID: {batchId}, Toplam Kayıt: {totalRecords}";
+                // Dosya içeriğini parse et ve import işlemini gerçekleştir
+                // ParseAndImportReport metodu batch oluşturur, verileri ImportDetails'e ekler ve sp_ProcessReconciliation'ı çağırır
+                var result = _customerDAL.ParseAndImportReport(fileContent, fileName, fileTimestamp, userId);
+
+                if (result.ErrorCount > 0)
+                {
+                    TempData["SuccessMessage"] = $"Dosya işlendi! Batch ID oluşturuldu. Başarılı: {result.SuccessCount}, Hatalı: {result.ErrorCount}. {result.Message}";
+                }
+                else
+                {
+                    TempData["SuccessMessage"] = $"Dosya başarıyla işlendi! Başarılı: {result.SuccessCount} kayıt. {result.Message}";
+                }
             }
             catch (Exception ex)
             {

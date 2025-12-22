@@ -88,23 +88,9 @@
                                         }
                                     </td>
                                     <td>
-                                        <div class="btn-group" role="group">
-                                            <a asp-action="Details" asp-route-id="@customer.CustomerID" class="btn btn-sm btn-outline-primary">
-                                                <i class="bi bi-eye"></i> Detay
-                                            </a>
-                                            @if (isAdminOrAccountant)
-                                            {
-                                                <a asp-action="Edit" asp-route-id="@customer.CustomerID" class="btn btn-sm btn-outline-warning">
-                                                    <i class="bi bi-pencil"></i> Düzenle
-                                                </a>
-                                                <form asp-action="Delete" asp-route-id="@customer.CustomerID" method="post" class="d-inline" onsubmit="return confirm('Bu müşteriyi silmek istediğinize emin misiniz? İşlem geri alınamaz.');">
-                                                    @Html.AntiForgeryToken()
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                        <i class="bi bi-trash"></i> Sil
-                                                    </button>
-                                                </form>
-                                            }
-                                        </div>
+                                        <a asp-action="Details" asp-route-id="@customer.CustomerID" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i> Detay
+                                        </a>
                                     </td>
                                 </tr>
                             }

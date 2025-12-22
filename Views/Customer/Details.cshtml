@@ -188,9 +188,7 @@
         </div>
 
         <!-- İşlem Geçmişi (Transaction History) -->
-        @{
-            var transactions = ViewBag.Transactions as List<DatabaseProject.Models.Transaction> ?? new List<DatabaseProject.Models.Transaction>();
-        }
+        var transactions = ViewBag.Transactions as List<DatabaseProject.Models.Transaction> ?? new List<DatabaseProject.Models.Transaction>();
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">

@@ -585,7 +585,20 @@ namespace DatabaseProject.DAL
                         }
                     }
 
-                    // 3. ADIM: Eşitleme Prosedürünü Tetikle (Reconciliation)
+                    // 3. ADIM: Batch'in TotalRecords'unu güncelle
+                    int totalRecords = successCount + errorCount;
+                    if (totalRecords > 0)
+                    {
+                        string updateTotalRecords = "UPDATE ImportBatches SET TotalRecords = @TotalRecords WHERE BatchID = @BatchID";
+                        using (SqlCommand updateCmd = new SqlCommand(updateTotalRecords, conn, transaction))
+                        {
+                            updateCmd.Parameters.AddWithValue("@TotalRecords", totalRecords);
+                            updateCmd.Parameters.AddWithValue("@BatchID", batchId);
+                            updateCmd.ExecuteNonQuery();
+                        }
+                    }
+
+                    // 4. ADIM: Eşitleme Prosedürünü Tetikle (Reconciliation)
                     using (SqlCommand procCmd = new SqlCommand("sp_ProcessReconciliation", conn, transaction))
                     {
                         procCmd.CommandType = CommandType.StoredProcedure;

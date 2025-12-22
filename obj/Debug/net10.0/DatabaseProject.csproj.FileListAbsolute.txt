@@ -62,7 +62,6 @@ C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\scopedcss\bundle\D
 C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\scopedcss\projectbundle\DatabaseProject.bundle.scp.css
 C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\compressed\swb4iq7g2j-{0}-b9sayid5wm-b9sayid5wm.gz
 C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\compressed\brdb1c6udz-{0}-61n19gt1b8-61n19gt1b8.gz
-C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\compressed\xuuy819r35-{0}-xtxxf3hu2r-xtxxf3hu2r.gz
 C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\compressed\uq6tmf5xdy-{0}-bqjiyaj88i-bqjiyaj88i.gz
 C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\compressed\yv280m7k0g-{0}-c2jlpeoesf-c2jlpeoesf.gz
 C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\compressed\oigxp5ctqt-{0}-erw9l3u2r3-erw9l3u2r3.gz
@@ -146,3 +145,4 @@ C:\Users\erkan\source\repos\DatabaseProject\bin\Debug\net10.0\RBush.dll
 C:\Users\erkan\source\repos\DatabaseProject\bin\Debug\net10.0\SixLabors.Fonts.dll
 C:\Users\erkan\source\repos\DatabaseProject\bin\Debug\net10.0\System.IO.Packaging.dll
 C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\DatabaseProject.sourcelink.json
+C:\Users\erkan\source\repos\DatabaseProject\obj\Debug\net10.0\compressed\xuuy819r35-{0}-f3za7mnimd-f3za7mnimd.gz
