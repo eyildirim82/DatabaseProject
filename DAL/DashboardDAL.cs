@@ -54,12 +54,9 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT RiskStatus, COUNT(*) as Count 
-                                FROM vw_CustomerRiskStatus 
-                                GROUP BY RiskStatus";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetRiskStatusDistribution", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     conn.Open();
 
                     using (SqlDataReader reader = cmd.ExecuteReader())
@@ -88,13 +85,9 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT PaymentDate, MethodName, TransactionCount, TotalAmount 
-                                FROM vw_DailyCashFlow 
-                                WHERE PaymentDate >= DATEADD(day, -@Days, GETDATE())
-                                ORDER BY PaymentDate ASC";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetDailyCashFlow", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Days", days);
                     conn.Open();
 
@@ -126,13 +119,9 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT CustomerID, CompanyName, RiskLimit, CurrentBalance, 
-                                AvailableLimit, RiskStatus 
-                                FROM vw_CustomerRiskStatus 
-                                ORDER BY RiskStatus, CurrentBalance DESC";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetCustomerRiskStatuses", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     conn.Open();
 
                     using (SqlDataReader reader = cmd.ExecuteReader())
@@ -163,15 +152,18 @@ namespace DatabaseProject.DAL
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT COUNT(*) 
-                                FROM Cheques 
-                                WHERE Status = 'Portfolio' 
-                                  AND DueDate < GETDATE()";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetOverdueChequesCount", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     conn.Open();
-                    return Convert.ToInt32(cmd.ExecuteScalar());
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return reader.GetInt32(reader.GetOrdinal("OverdueCount"));
+                        }
+                    }
+                    return 0;
                 }
             }
         }

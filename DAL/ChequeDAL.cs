@@ -23,12 +23,9 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT ChequeID, CompanyName, BankName, Amount, DueDate, DaysToMaturity
-                                FROM vw_PortfolioCheques
-                                ORDER BY DueDate ASC";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetPortfolioCheques", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     conn.Open();
 
                     using (SqlDataReader reader = cmd.ExecuteReader())
@@ -61,15 +58,9 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT ch.ChequeID, ch.CustomerID, c.CompanyName, ch.BankName, ch.ChequeNumber, 
-                                ch.Amount, ch.DueDate, ch.Status, ch.ReceivedDate
-                                FROM Cheques ch
-                                INNER JOIN Customers c ON ch.CustomerID = c.CustomerID
-                                WHERE (@Status IS NULL OR ch.Status = @Status)
-                                ORDER BY ch.DueDate ASC";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetAllCheques", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Status", (object?)statusFilter ?? DBNull.Value);
                     conn.Open();
 
@@ -153,14 +144,9 @@ namespace DatabaseProject.DAL
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT ch.ChequeID, ch.CustomerID, c.CompanyName, ch.BankName, ch.ChequeNumber, 
-                                ch.Amount, ch.DueDate, ch.Status, ch.ReceivedDate
-                                FROM Cheques ch
-                                INNER JOIN Customers c ON ch.CustomerID = c.CustomerID
-                                WHERE ch.ChequeID = @ChequeID";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetChequeById", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@ChequeID", chequeId);
                     conn.Open();
 
@@ -195,10 +181,9 @@ namespace DatabaseProject.DAL
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = "DELETE FROM Cheques WHERE ChequeID = @ChequeID";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_DeleteCheque", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@ChequeID", chequeId);
                     conn.Open();
                     cmd.ExecuteNonQuery();

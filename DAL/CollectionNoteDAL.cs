@@ -23,16 +23,9 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT cn.NoteID, cn.CustomerID, cn.UserID, cn.NoteText, cn.PromiseDate, cn.CreatedAt,
-                                c.CompanyName, u.FullName
-                                FROM CollectionNotes cn
-                                INNER JOIN Customers c ON cn.CustomerID = c.CustomerID
-                                INNER JOIN AppUsers u ON cn.UserID = u.UserID
-                                WHERE cn.CustomerID = @CustomerID
-                                ORDER BY cn.CreatedAt DESC";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetCollectionNotes", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@CustomerID", customerId);
                     conn.Open();
 
@@ -68,16 +61,9 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT cn.NoteID, cn.CustomerID, cn.UserID, cn.NoteText, cn.PromiseDate, cn.CreatedAt,
-                                c.CompanyName, u.FullName
-                                FROM CollectionNotes cn
-                                INNER JOIN Customers c ON cn.CustomerID = c.CustomerID
-                                INNER JOIN AppUsers u ON cn.UserID = u.UserID
-                                WHERE cn.UserID = @UserID
-                                ORDER BY cn.CreatedAt DESC";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetCollectionNotesByUser", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@UserID", userId);
                     conn.Open();
 
@@ -113,16 +99,9 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT cn.NoteID, cn.CustomerID, cn.UserID, cn.NoteText, cn.PromiseDate, cn.CreatedAt,
-                                c.CompanyName, u.FullName
-                                FROM CollectionNotes cn
-                                INNER JOIN Customers c ON cn.CustomerID = c.CustomerID
-                                INNER JOIN AppUsers u ON cn.UserID = u.UserID
-                                WHERE (@CustomerID IS NULL OR cn.CustomerID = @CustomerID)
-                                ORDER BY cn.CreatedAt DESC";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetAllCollectionNotes", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@CustomerID", (object?)customerId ?? DBNull.Value);
                     conn.Open();
 
@@ -178,15 +157,9 @@ namespace DatabaseProject.DAL
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT cn.NoteID, cn.CustomerID, cn.UserID, cn.NoteText, cn.PromiseDate, cn.CreatedAt,
-                                c.CompanyName, u.FullName
-                                FROM CollectionNotes cn
-                                INNER JOIN Customers c ON cn.CustomerID = c.CustomerID
-                                INNER JOIN AppUsers u ON cn.UserID = u.UserID
-                                WHERE cn.NoteID = @NoteID";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetCollectionNoteById", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@NoteID", noteId);
                     conn.Open();
 
@@ -220,12 +193,9 @@ namespace DatabaseProject.DAL
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"UPDATE CollectionNotes 
-                                SET NoteText = @NoteText, PromiseDate = @PromiseDate
-                                WHERE NoteID = @NoteID";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_UpdateCollectionNote", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@NoteID", noteId);
                     cmd.Parameters.AddWithValue("@NoteText", noteText);
                     cmd.Parameters.AddWithValue("@PromiseDate", (object?)promiseDate ?? DBNull.Value);
@@ -243,10 +213,9 @@ namespace DatabaseProject.DAL
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = "DELETE FROM CollectionNotes WHERE NoteID = @NoteID";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_DeleteCollectionNote", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@NoteID", noteId);
                     conn.Open();
                     cmd.ExecuteNonQuery();

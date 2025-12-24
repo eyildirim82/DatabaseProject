@@ -19,8 +19,9 @@ namespace DatabaseProject.DAL
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                using (SqlCommand cmd = new SqlCommand("SELECT MethodID, MethodName FROM PaymentMethods", conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetPaymentMethods", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     SqlDataAdapter da = new SqlDataAdapter(cmd);
                     DataTable dt = new DataTable();
                     conn.Open();
@@ -35,8 +36,9 @@ namespace DatabaseProject.DAL
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                using (SqlCommand cmd = new SqlCommand("SELECT AccountID, BankName FROM CompanyAccounts", conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetCompanyAccounts", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     SqlDataAdapter da = new SqlDataAdapter(cmd);
                     DataTable dt = new DataTable();
                     conn.Open();
@@ -100,21 +102,9 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT t.TransactionID, t.CustomerID, t.MethodID, t.AccountID, t.Amount, 
-                                t.Description, t.TransactionDate, t.CreatedBy,
-                                c.CompanyName, pm.MethodName, ca.BankName, u.FullName
-                                FROM Transactions t
-                                INNER JOIN Customers c ON t.CustomerID = c.CustomerID
-                                INNER JOIN PaymentMethods pm ON t.MethodID = pm.MethodID
-                                LEFT JOIN CompanyAccounts ca ON t.AccountID = ca.AccountID
-                                INNER JOIN AppUsers u ON t.CreatedBy = u.UserID
-                                WHERE (@CustomerID IS NULL OR t.CustomerID = @CustomerID)
-                                AND (@StartDate IS NULL OR t.TransactionDate >= @StartDate)
-                                AND (@EndDate IS NULL OR t.TransactionDate <= @EndDate)
-                                ORDER BY t.TransactionDate DESC";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetAllTransactions", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@CustomerID", (object?)customerId ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@StartDate", (object?)startDate ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@EndDate", (object?)endDate ?? DBNull.Value);

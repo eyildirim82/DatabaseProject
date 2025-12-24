@@ -21,29 +21,28 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT CustomerID, AccountCode, CompanyName, TaxID, TaxOffice, 
-                                 Address, PhoneNumber, RiskLimit, CurrentBalance, AvailableRisk 
-                                 FROM Customers ORDER BY CompanyName";
-                
-                SqlCommand cmd = new SqlCommand(query, conn);
-                conn.Open();
-                
-                using (SqlDataReader reader = cmd.ExecuteReader())
+                using (SqlCommand cmd = new SqlCommand("sp_GetAllCustomers", conn))
                 {
-                    while (reader.Read())
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    conn.Open();
+                    
+                    using (SqlDataReader reader = cmd.ExecuteReader())
                     {
-                        customers.Add(new Customer
+                        while (reader.Read())
                         {
-                            CustomerID = reader.GetInt32(reader.GetOrdinal("CustomerID")),
-                            AccountCode = reader.GetString(reader.GetOrdinal("AccountCode")),
-                            CompanyName = reader.GetString(reader.GetOrdinal("CompanyName")),
-                            TaxID = reader.IsDBNull(reader.GetOrdinal("TaxID")) ? null : reader.GetString(reader.GetOrdinal("TaxID")),
-                            TaxOffice = reader.IsDBNull(reader.GetOrdinal("TaxOffice")) ? null : reader.GetString(reader.GetOrdinal("TaxOffice")),
-                            Address = reader.IsDBNull(reader.GetOrdinal("Address")) ? null : reader.GetString(reader.GetOrdinal("Address")),
-                            PhoneNumber = reader.IsDBNull(reader.GetOrdinal("PhoneNumber")) ? null : reader.GetString(reader.GetOrdinal("PhoneNumber")),
-                            RiskLimit = reader.GetDecimal(reader.GetOrdinal("RiskLimit")),
-                            CurrentBalance = reader.GetDecimal(reader.GetOrdinal("CurrentBalance"))
-                        });
+                            customers.Add(new Customer
+                            {
+                                CustomerID = reader.GetInt32(reader.GetOrdinal("CustomerID")),
+                                AccountCode = reader.GetString(reader.GetOrdinal("AccountCode")),
+                                CompanyName = reader.GetString(reader.GetOrdinal("CompanyName")),
+                                TaxID = reader.IsDBNull(reader.GetOrdinal("TaxID")) ? null : reader.GetString(reader.GetOrdinal("TaxID")),
+                                TaxOffice = reader.IsDBNull(reader.GetOrdinal("TaxOffice")) ? null : reader.GetString(reader.GetOrdinal("TaxOffice")),
+                                Address = reader.IsDBNull(reader.GetOrdinal("Address")) ? null : reader.GetString(reader.GetOrdinal("Address")),
+                                PhoneNumber = reader.IsDBNull(reader.GetOrdinal("PhoneNumber")) ? null : reader.GetString(reader.GetOrdinal("PhoneNumber")),
+                                RiskLimit = reader.GetDecimal(reader.GetOrdinal("RiskLimit")),
+                                CurrentBalance = reader.GetDecimal(reader.GetOrdinal("CurrentBalance"))
+                            });
+                        }
                     }
                 }
             }
@@ -58,13 +57,9 @@ namespace DatabaseProject.DAL
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT CustomerID, AccountCode, CompanyName, TaxID, TaxOffice, 
-                                Address, PhoneNumber, RiskLimit, CurrentBalance, AvailableRisk 
-                                FROM Customers 
-                                WHERE CustomerID = @CustomerID";
-                
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetCustomerById", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@CustomerID", customerId);
                     conn.Open();
                     
@@ -193,12 +188,11 @@ namespace DatabaseProject.DAL
             {
                 await connection.OpenAsync();
                 
-                string query = @"SELECT TOP 20 BatchID, FileName, FileTimestamp, UploadDate, TotalRecords, Status 
-                                FROM ImportBatches 
-                                ORDER BY UploadDate DESC";
-
-                using (var cmd = new SqlCommand(query, connection))
+                using (var cmd = new SqlCommand("sp_GetImportHistory", connection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@TopCount", 20);
+
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -311,51 +305,23 @@ namespace DatabaseProject.DAL
             {
                 conn.Open();
 
-                // Önce toplam kayıt sayısını al
-                string countQuery = @"SELECT COUNT(*) FROM ImportBatches 
-                                     WHERE (@Status IS NULL OR Status = @Status)
-                                       AND (@FileName IS NULL OR FileName LIKE '%' + @FileName + '%')
-                                       AND (@StartDate IS NULL OR UploadDate >= @StartDate)
-                                       AND (@EndDate IS NULL OR UploadDate <= @EndDate)";
-
-                using (SqlCommand countCmd = new SqlCommand(countQuery, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetImportHistoryWithFilters", conn))
                 {
-                    countCmd.Parameters.AddWithValue("@Status", (object?)statusFilter ?? DBNull.Value);
-                    countCmd.Parameters.AddWithValue("@FileName", (object?)fileNameFilter ?? DBNull.Value);
-                    countCmd.Parameters.AddWithValue("@StartDate", (object?)startDate ?? DBNull.Value);
-                    countCmd.Parameters.AddWithValue("@EndDate", (object?)endDate ?? DBNull.Value);
-                    totalRecords = (int)countCmd.ExecuteScalar();
-                }
-
-                // Sonra sayfalanmış ve sıralanmış verileri al
-                int offset = (pageNumber - 1) * pageSize;
-                string sortColumn = sortBy switch
-                {
-                    "FileName" => "FileName",
-                    "FileTimestamp" => "FileTimestamp",
-                    "TotalRecords" => "TotalRecords",
-                    "Status" => "Status",
-                    _ => "UploadDate"
-                };
-
-                string query = $@"SELECT BatchID, FileName, FileTimestamp, UploadDate, TotalRecords, Status 
-                                 FROM ImportBatches 
-                                 WHERE (@Status IS NULL OR Status = @Status)
-                                   AND (@FileName IS NULL OR FileName LIKE '%' + @FileName + '%')
-                                   AND (@StartDate IS NULL OR UploadDate >= @StartDate)
-                                   AND (@EndDate IS NULL OR UploadDate <= @EndDate)
-                                 ORDER BY {sortColumn} {(sortDirection == "ASC" ? "ASC" : "DESC")}
-                                 OFFSET @Offset ROWS
-                                 FETCH NEXT @PageSize ROWS ONLY";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
-                {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Status", (object?)statusFilter ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@FileName", (object?)fileNameFilter ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@StartDate", (object?)startDate ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@EndDate", (object?)endDate ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Offset", offset);
+                    cmd.Parameters.AddWithValue("@PageNumber", pageNumber);
                     cmd.Parameters.AddWithValue("@PageSize", pageSize);
+                    cmd.Parameters.AddWithValue("@SortBy", sortBy);
+                    cmd.Parameters.AddWithValue("@SortDirection", sortDirection);
+                    
+                    var totalRecordsParam = new SqlParameter("@TotalRecords", SqlDbType.Int)
+                    {
+                        Direction = ParameterDirection.Output
+                    };
+                    cmd.Parameters.Add(totalRecordsParam);
 
                     using (SqlDataReader reader = cmd.ExecuteReader())
                     {
@@ -372,6 +338,8 @@ namespace DatabaseProject.DAL
                             });
                         }
                     }
+                    
+                    totalRecords = totalRecordsParam.Value != DBNull.Value ? (int)totalRecordsParam.Value : 0;
                 }
             }
 
@@ -384,13 +352,9 @@ namespace DatabaseProject.DAL
 
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = @"SELECT DetailID, BatchID, AccountCode, DetectedName, ExcelBalance, SystemBalanceAtTime, ErrorMessage
-                                FROM ImportDetails
-                                WHERE BatchID = @BatchID
-                                ORDER BY AccountCode";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetBatchDetails", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@BatchID", batchId);
                     conn.Open();
 
@@ -424,18 +388,9 @@ namespace DatabaseProject.DAL
             {
                 conn.Open();
 
-                // Toplam batch sayısı ve status'lere göre sayılar
-                string query = @"SELECT 
-                                    COUNT(*) as TotalBatches,
-                                    SUM(CASE WHEN Status = 'Processed' THEN 1 ELSE 0 END) as ProcessedCount,
-                                    SUM(CASE WHEN Status = 'Pending' THEN 1 ELSE 0 END) as PendingCount,
-                                    SUM(CASE WHEN Status = 'Rejected' THEN 1 ELSE 0 END) as RejectedCount,
-                                    SUM(TotalRecords) as TotalRecords,
-                                    MAX(UploadDate) as LastUploadDate
-                                 FROM ImportBatches";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_GetBatchStatistics", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     using (SqlDataReader reader = cmd.ExecuteReader())
                     {
                         if (reader.Read())
@@ -458,15 +413,14 @@ namespace DatabaseProject.DAL
         {
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
-                string query = "UPDATE ImportBatches SET Status = @Status WHERE BatchID = @BatchID";
-
-                using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlCommand cmd = new SqlCommand("sp_UpdateBatchStatus", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Status", newStatus);
                     cmd.Parameters.AddWithValue("@BatchID", batchId);
                     conn.Open();
 
-                    int rowsAffected = cmd.ExecuteNonQuery();
+                    int rowsAffected = (int)cmd.ExecuteScalar();
                     return rowsAffected > 0;
                 }
             }
@@ -477,33 +431,20 @@ namespace DatabaseProject.DAL
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                SqlTransaction transaction = conn.BeginTransaction();
-
-                try
+                using (SqlCommand cmd = new SqlCommand("sp_DeleteBatch", conn))
                 {
-                    // Önce ImportDetails kayıtlarını sil
-                    string deleteDetailsQuery = "DELETE FROM ImportDetails WHERE BatchID = @BatchID";
-                    using (SqlCommand detailCmd = new SqlCommand(deleteDetailsQuery, conn, transaction))
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@BatchID", batchId);
+                    
+                    try
                     {
-                        detailCmd.Parameters.AddWithValue("@BatchID", batchId);
-                        detailCmd.ExecuteNonQuery();
-                    }
-
-                    // Sonra ImportBatch kaydını sil
-                    string deleteBatchQuery = "DELETE FROM ImportBatches WHERE BatchID = @BatchID";
-                    using (SqlCommand batchCmd = new SqlCommand(deleteBatchQuery, conn, transaction))
-                    {
-                        batchCmd.Parameters.AddWithValue("@BatchID", batchId);
-                        int rowsAffected = batchCmd.ExecuteNonQuery();
-                        
-                        transaction.Commit();
+                        int rowsAffected = (int)cmd.ExecuteScalar();
                         return rowsAffected > 0;
                     }
-                }
-                catch
-                {
-                    transaction.Rollback();
-                    return false;
+                    catch
+                    {
+                        return false;
+                    }
                 }
             }
         }
@@ -589,9 +530,9 @@ namespace DatabaseProject.DAL
                     int totalRecords = successCount + errorCount;
                     if (totalRecords > 0)
                     {
-                        string updateTotalRecords = "UPDATE ImportBatches SET TotalRecords = @TotalRecords WHERE BatchID = @BatchID";
-                        using (SqlCommand updateCmd = new SqlCommand(updateTotalRecords, conn, transaction))
+                        using (SqlCommand updateCmd = new SqlCommand("sp_UpdateBatchTotalRecords", conn, transaction))
                         {
+                            updateCmd.CommandType = CommandType.StoredProcedure;
                             updateCmd.Parameters.AddWithValue("@TotalRecords", totalRecords);
                             updateCmd.Parameters.AddWithValue("@BatchID", batchId);
                             updateCmd.ExecuteNonQuery();
